@@ -1,19 +1,41 @@
 package nnnmc.seanet.sea_nrs.protocol;
 
+import com.google.common.collect.ImmutableMap;
 import org.onlab.packet.*;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.Objects;
 
 import static org.onlab.packet.PacketUtils.checkInput;
 
+/**
+ * |------------------------8------------------------16
+ * |-------Next Header------|-S.EID Type-|-D.EID Type-|
+ * |--------------------Reserved----------------------|
+ * |--------------------------------------------------|
+ * |                                                  |
+ * |                  Source EID (20B)                |
+ * |                                                  |
+ * |--------------------------------------------------|
+ * |                                                  |
+ * |                   Dest EID (20B)                 |
+ * |                                                  |
+ * |--------------------------------------------------|
+ */
 public class IDP extends BasePacket {
 
     private static final short IDP_HEADER_LENGTH = 44;
     private static final short EID_LENGTH = 20;
     public static final byte PROTOCOL_IDP = (byte) 0x99;
+    public static final byte PROTOCOL_NRS = 0x10;
     public static final byte PROTOCOL_SEADP = 0x01;
+
+    public static final Map<Byte, Deserializer<? extends IPacket>> PROTOCOL_DESERIALIZER_MAP =
+            ImmutableMap.<Byte, Deserializer<? extends IPacket>>builder()
+                    .put(IDP.PROTOCOL_NRS, NRS.deserializer())
+                    .build();
 
     protected byte nextHeader;
     protected byte sEidType;
@@ -98,7 +120,7 @@ public class IDP extends BasePacket {
 
     /**
      * Deserializer function for IDP packets.
-     *
+     * todo 这个地方不知道会不会有问题，应该呗IPv6类调用一下，但是不知道怎么加上
      * @return deserializer function
      */
     public static Deserializer<IDP> deserializer() {
@@ -117,7 +139,11 @@ public class IDP extends BasePacket {
             bb.get(idp.destEID, 0, EID_LENGTH);
 
             Deserializer<? extends IPacket> deserializer;
-            deserializer = Data.deserializer();
+            if (IDP.PROTOCOL_DESERIALIZER_MAP.containsKey(idp.nextHeader)) {
+                deserializer = IDP.PROTOCOL_DESERIALIZER_MAP.get(idp.nextHeader);
+            } else {
+                deserializer = Data.deserializer();
+            }
 
             idp.payload = deserializer.deserialize(data, bb.position(),
                     bb.limit() - bb.position());
