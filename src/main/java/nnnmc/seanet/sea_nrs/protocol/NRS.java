@@ -143,5 +143,9 @@ public class NRS extends BasePacket {
                 ", NA=" + Arrays.toString(NA) +
                 '}';
     }
+
+    public void setQueryType(byte queryType) {
+        this.queryType = queryType;
+    }
 }
 

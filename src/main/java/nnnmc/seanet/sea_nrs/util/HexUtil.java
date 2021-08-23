@@ -32,22 +32,6 @@ public class HexUtil {
         return stringBuilder.toString();
     }
 
-    public static String bytes2HexString(byte[] src) {
-        StringBuilder stringBuilder = new StringBuilder();
-        if (src == null || src.length <= 0) {
-            return null;
-        }
-        for (byte b : src) {
-            int v = b & 0xFF;
-            String hv = Integer.toHexString(v);
-            if (hv.length() < 2) {
-                stringBuilder.append(0);
-            }
-            stringBuilder.append(hv);
-        }
-        return stringBuilder.toString();
-    }
-
     public static String ip2HexString(String ip, int totalLen) {
         String NA = "";
         if (ip.contains(".")) {

@@ -1,8 +1,12 @@
 package nnnmc.seanet.sea_nrs;
 
 import nnnmc.seanet.controller.api.FlowRuleCache;
+import nnnmc.seanet.sea_nrs.protocol.IDP;
+import nnnmc.seanet.sea_nrs.protocol.NRS;
 import nnnmc.seanet.sea_nrs.util.HexUtil;
+import nnnmc.seanet.sea_nrs.util.SendAndRecv;
 import nnnmc.seanet.sea_nrs.util.SocketUtil;
+import org.onlab.packet.Data;
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.IPv6;
 import org.onosproject.cfg.ComponentConfigService;
@@ -61,6 +65,9 @@ public class SeanrsApp {
     private static final int MobilityTableID_for_Qinq = 22;
     private static final String NA_ZEROS = HexUtil.zeros(32);
     private static final String EID_ZEROS = HexUtil.zeros(40);
+    private static final String IRS_NA = "192.168.47.200";
+    private static final String BGP_NA = "192.168.47.200";
+    private static final int IRS_port = 10061;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected FlowRuleService flowRuleService;
@@ -480,10 +487,14 @@ public class SeanrsApp {
         }
     }
 
+
     // ====================== process =========================
-    //对于设备标识为DeviceId的某设备，用函数getProcessStatusByDeviceId判断fibApp是否下发过表项，下发过则调用alreadyProcessedSetAdd函数将其记录在processedDeviceIdSet中；
-    //当设备下线后，调用resetStatusByDeviceId函数，将该设备的DeviceId从processedDeviceIdSet中移出。以此来避免重复下发表项
-    private CopyOnWriteArraySet<DeviceId> processedDeviceIdSet = new CopyOnWriteArraySet<DeviceId>();
+    /**
+     * 对于设备标识为DeviceId的某设备，用函数getProcessStatusByDeviceId判断fibApp是否下发过表项，
+     * 下发过则调用processedSetAdd函数将其记录在processedDeviceIdSet中；
+     * 当设备下线后，调用resetStatusByDeviceId函数，将该设备的DeviceId从processedDeviceIdSet中移出。以此来避免重复下发表项
+     */
+    private final CopyOnWriteArraySet<DeviceId> processedDeviceIdSet = new CopyOnWriteArraySet<DeviceId>();
 
     public synchronized void processedSetAdd(DeviceId deviceId) {
         processedDeviceIdSet.add(deviceId);
@@ -519,42 +530,44 @@ public class SeanrsApp {
                 case RULE_ADD_REQUESTED: {
                     DeviceId deviceId = rule.deviceId();
                     if (deviceId.toString().startsWith("pof")) {
-                        switch (rule.type()) {
-                            case FlowRuleType.TABLE_MOD: //flow table add
-                            {
-                                if (tableSentCache.contains(rule)) {
-                                    tableInstalledCache.add(rule);
-                                    if (allNRSTablesInstalled(deviceId) && (instructionBlockSentCache.size(deviceId) == 0)) {
-                                        executor.execute(() -> {
-                                            addDefaultInstructionBlock(deviceId);
-                                        });
-                                    }
-                                }
-                            }
-                            break;
-                            case FlowRuleType.INSTRUCTION_BLOCK_MOD: //instruction block add
-                            {
-                                executor.execute(() -> {
-                                    if (instructionBlockSentCache.contains(rule)) {
-                                        //log.debug("INSTRUCTION_BLOCK_MOD instructionBlockSentCache.contains\n");
-                                        instructionBlockInstalledCache.add(rule);
-                                        //需要的默认指令块全部添加完毕，则下发表项
-                                        if (allDefaultInstructionBlocksInstalled(deviceId) && !getProcessStatusByDeviceId(deviceId)) {
-                                            //log.debug("INSTRUCTION_BLOCK_MOD call onDefaultBlocksAddedByDevice,add default entries\n");
+                        NodeId master = mastershipService.getMasterFor(deviceId);
+                        if (Objects.equals(local, master)) {
+                            switch (rule.type()) {
+                                case FlowRuleType.TABLE_MOD: //flow table add
+                                {
+                                    if (tableSentCache.contains(rule)) {
+                                        tableInstalledCache.add(rule);
+                                        if (allNRSTablesInstalled(deviceId) && (instructionBlockSentCache.size(deviceId) == 0)) {
                                             executor.execute(() -> {
-                                                addDefaultFlowEntry(deviceId);
-                                                processedSetAdd(deviceId);
+                                                addDefaultInstructionBlock(deviceId);
                                             });
                                         }
                                     }
-                                });
+                                }
                                 break;
+                                case FlowRuleType.INSTRUCTION_BLOCK_MOD: //instruction block add
+                                {
+                                    executor.execute(() -> {
+                                        if (instructionBlockSentCache.contains(rule)) {
+                                            //log.debug("INSTRUCTION_BLOCK_MOD instructionBlockSentCache.contains\n");
+                                            instructionBlockInstalledCache.add(rule);
+                                            //需要的默认指令块全部添加完毕，则下发表项; 如果该设备上的表项已经下发完成则不再下发
+                                            if (allDefaultInstructionBlocksInstalled(deviceId) && !getProcessStatusByDeviceId(deviceId)) {
+                                                //log.debug("INSTRUCTION_BLOCK_MOD call onDefaultBlocksAddedByDevice,add default entries\n");
+                                                executor.execute(() -> {
+                                                    addDefaultFlowEntry(deviceId);
+                                                    processedSetAdd(deviceId);
+                                                });
+                                            }
+                                        }
+                                    });
+                                    break;
+                                }
+                                default:
+                                    break;
                             }
-                            default:
-                                break;
                         }
                     }
-                    break;
                 }
             }
         }
@@ -568,60 +581,71 @@ public class SeanrsApp {
             if (context.isHandled()) {
                 return;
             }
-            long firstTime = System.currentTimeMillis();
             InboundPacket pkt = context.inPacket();
             ConnectPoint ingressPort = pkt.receivedFrom();
             DeviceId deviceId = ingressPort.deviceId();
             PortNumber port = ingressPort.port();
             Ethernet ethPkt = pkt.parsed();
+            // TODO: 2021/8/22 Vlan 和 Qinq 先不处理 
+            short pkt_type = ethPkt.getEtherType();
+            if (pkt_type == Ethernet.TYPE_VLAN) {
+                return;
+            }
+            if (pkt_type == Ethernet.TYPE_QINQ) {
+                return;
+            }
             IPv6 ipv6Pkt = (IPv6) ethPkt.getPayload();
             int nextHdr = HexUtil.byteToUnsignedInt(ipv6Pkt.getNextHeader());
             if (nextHdr == 0x11) {
                 // TODO: 2021/7/27 UDP 实际上并不会执行
+                log.info("receive UDP packet, content: {}", SocketUtil.bytesToHexString(ipv6Pkt.serialize()));
             } else if (nextHdr == 0x99) {
                 // TODO: 2021/7/27 IDP 暂定使用扩展包头的方式
-                byte[] ipv6PktByte = ipv6Pkt.serialize();
-                byte idpNextHeader = ipv6PktByte[40];
-                byte[] idpReserved = {ipv6PktByte[42], ipv6PktByte[43]}; // 网内解析使用该字段前4个bit
-
-                byte[] srcEidByte = new byte[20];
-                System.arraycopy(ipv6PktByte, 44, srcEidByte, 0, 20);
-                byte[] dstEidByte = new byte[20];
-                System.arraycopy(ipv6PktByte, 64, dstEidByte, 0, 20);
-                String srcEid = HexUtil.bytes2HexString(srcEidByte);
-                String dstEid = HexUtil.bytes2HexString(dstEidByte);
-                if ((idpReserved[0] & 0xf0) == 0x80) {
-                    if (Objects.equals(dstEid, EID_ZEROS)) {
-                        // TODO: 2021/8/13 register or deregister
-                        byte[] idpAndUdpPkt_byte = ipv6Pkt.getPayload().serialize(); // 这里payload只去掉IPV6基本包头 (40B)
-                        byte[] udpPayload_byte = new byte[idpAndUdpPkt_byte.length - 44 - 8];
-                        System.arraycopy(idpAndUdpPkt_byte, 44 + 8, udpPayload_byte, 0, idpAndUdpPkt_byte.length - 44 - 8);
-                        String payLoad = SocketUtil.bytesToHexString(udpPayload_byte);
-                        // TODO: 2021/8/17 根据payload解析注册注销字段
-                        // register
-                        if (payLoad != null) {
-                            if (payLoad.substring(0, 2).equals("6f")) {
-
-                            }
-                            // deregister
-                            if (payLoad.substring(0, 2).equals("73")) {
-
+//                byte[] ipv6PktByte = ipv6Pkt.serialize();
+//                byte idpNextHeader = ipv6PktByte[40]; // 网内解析匹配字段，0x10
+//                byte[] idpReserved = {ipv6PktByte[42], ipv6PktByte[43]}; //
+//                byte[] srcEidByte = new byte[20];
+//                System.arraycopy(ipv6PktByte, 44, srcEidByte, 0, 20);
+//                byte[] dstEidByte = new byte[20];
+//                System.arraycopy(ipv6PktByte, 64, dstEidByte, 0, 20);
+                IDP idpPkt = (IDP) ipv6Pkt.getPayload();
+                String nextHeader = HexUtil.byte2HexString(idpPkt.getNextHeader());
+                String srcEid = SocketUtil.bytesToHexString(idpPkt.getSourceEID());
+                String dstEid = SocketUtil.bytesToHexString(idpPkt.getDestEID());
+                // 处理网内解析请求 0x10
+                if (nextHeader.equals("10")) {
+                    NRS nrsPkt = (NRS) idpPkt.getPayload();
+                    String queryType = HexUtil.byte2HexString(nrsPkt.getQueryType());
+                    if (queryType.equals("01") || queryType.equals("02")) {
+                        // TODO: 2021/8/22 register or deregister
+                        byte[] payload = nrsPkt.getPayload().serialize();
+                        if (payload != null) {
+                            // 转发注册或注销请求给解析单点, 获取相应之后返回
+                            String responseType = queryType.equals("01") ? "03" : "04";
+                            byte[] receive = SendAndRecv.throughUDP(IRS_NA, IRS_port, payload);
+                            if (receive != null) {
+                                if (Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).startsWith("01", 2)) {
+                                    // 注册或注销成功，转发给BGP, 控制器不返回注册注销响应报文
+                                    nrsPkt.setPayload(new Data(payload));
+                                    nrsPkt.setQueryType(SocketUtil.hexStringToBytes(responseType)[0]);
+                                    idpPkt.setPayload(nrsPkt);
+                                    ipv6Pkt.setPayload(idpPkt);
+                                    ipv6Pkt.setDestinationAddress(SocketUtil.hexStringToBytes(HexUtil.ip2HexString(BGP_NA, 32)));
+                                    ethPkt.setPayload(ipv6Pkt);
+                                    byte[] sourceMACAddress = ethPkt.getSourceMACAddress();
+                                    ethPkt.setSourceMACAddress(ethPkt.getDestinationMAC());
+                                    ethPkt.setDestinationMACAddress(sourceMACAddress);
+                                }
+                            } else {
+                                log.warn("receive packets from IRS is null!");
                             }
                         }
-
                     } else {
-                        // TODO: 2021/8/13 resolve
+                        // TODO: 2021/8/22 resolve
                         String na = eid_na_map.get(dstEid);
-//                        System.arraycopy(SocketUtil.hexStringToBytes(na), 0, ipv6PktByte, 24, 16);
+                        //                        System.arraycopy(SocketUtil.hexStringToBytes(na), 0, ipv6PktByte, 24, 16);
                         ipv6Pkt.setDestinationAddress(SocketUtil.hexStringToBytes(na));
                         ethPkt.setPayload(ipv6Pkt);
-                        byte[] outPutBytes = ethPkt.serialize();
-                        ByteBuffer bf = ByteBuffer.allocate(outPutBytes.length);
-                        bf.put(outPutBytes).flip();
-                        FlowModTreatment flowModTreatment = new FlowModTreatment(buildGotoTableInstructionBlock(deviceId, forwardTableId_for_Ipv6).id().value());
-                        TrafficTreatment.Builder builder = DefaultTrafficTreatment.builder();
-                        builder.extension(flowModTreatment, deviceId);
-                        packetService.emit(new DefaultOutboundPacket(deviceId, builder.build(), bf));
                         // TODO: 2021/8/16 是否下发流表项，下发策略？
                         if (dstEid != null) {
                             addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, SEANRS_TABLEID_IPV6, MobilityTableID_for_Ipv6);
@@ -629,6 +653,13 @@ public class SeanrsApp {
                             addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, SEANRS_TABLEID_Qinq, MobilityTableID_for_Qinq);
                         }
                     }
+                    FlowModTreatment flowModTreatment = new FlowModTreatment(buildGotoTableInstructionBlock(deviceId, MobilityTableID_for_Ipv6).id().value());
+                    TrafficTreatment.Builder builder = DefaultTrafficTreatment.builder();
+                    builder.extension(flowModTreatment, deviceId);
+                    byte[] outPutBytes = ethPkt.serialize();
+                    ByteBuffer bf = ByteBuffer.allocate(outPutBytes.length);
+                    bf.put(outPutBytes).flip();
+                    packetService.emit(new DefaultOutboundPacket(deviceId, builder.build(), bf));
                 }
             }
         }
