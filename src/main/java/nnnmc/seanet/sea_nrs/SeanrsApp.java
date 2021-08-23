@@ -9,6 +9,7 @@ import nnnmc.seanet.sea_nrs.util.SocketUtil;
 import org.onlab.packet.Data;
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.IPv6;
+import org.onlab.packet.IpAddress;
 import org.onosproject.cfg.ComponentConfigService;
 import org.onosproject.cluster.ClusterService;
 import org.onosproject.cluster.NodeId;
@@ -21,9 +22,9 @@ import org.onosproject.mastership.MastershipService;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.Device;
 import org.onosproject.net.DeviceId;
-import org.onosproject.net.PortNumber;
 import org.onosproject.net.device.DeviceService;
 import org.onosproject.net.flow.*;
+import org.onosproject.net.intf.Interface;
 import org.onosproject.net.intf.InterfaceService;
 import org.onosproject.net.packet.*;
 import org.onosproject.pof.*;
@@ -32,10 +33,9 @@ import org.osgi.service.component.annotations.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
-import java.util.Dictionary;
-import java.util.HashMap;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -66,7 +66,8 @@ public class SeanrsApp {
     private static final String NA_ZEROS = HexUtil.zeros(32);
     private static final String EID_ZEROS = HexUtil.zeros(40);
     private static final String IRS_NA = "192.168.47.200";
-    private static final String BGP_NA = "192.168.47.200";
+    private static List<String> bgp_Na_List = new ArrayList<>();
+    private static final int BGP_NUM = 1;
     private static final int IRS_port = 10061;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
@@ -129,6 +130,7 @@ public class SeanrsApp {
         eid_na_map.put("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "99999999999999999999999999999999");
         eid_na_map.put("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbc", "99999999999999999999999999999999");
         eid_na_map.put("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbd", "99999999999999999999999999999999");
+        bgp_Na_List.add("192.168.47.198");
 //        -------------------------
         appId = coreService.registerApplication("org.onosproject.sea_nrs");
         local = clusterService.getLocalNode().id();
@@ -583,8 +585,11 @@ public class SeanrsApp {
             }
             InboundPacket pkt = context.inPacket();
             ConnectPoint ingressPort = pkt.receivedFrom();
+            Interface anInterface = interfaceService.getInterfacesByPort(ingressPort).stream().findFirst().orElse(null);
+            IpAddress ipAddress = Objects.requireNonNull(anInterface).ipAddressesList().get(0).ipAddress();
+            String fromSwitchIP = ipAddress.toInetAddress().getHostAddress();
+            String fromSwitchIP_hex = HexUtil.ip2HexString(fromSwitchIP, 32);
             DeviceId deviceId = ingressPort.deviceId();
-            PortNumber port = ingressPort.port();
             Ethernet ethPkt = pkt.parsed();
             // TODO: 2021/8/22 Vlan 和 Qinq 先不处理 
             short pkt_type = ethPkt.getEtherType();
@@ -621,29 +626,74 @@ public class SeanrsApp {
                         byte[] payload = nrsPkt.getPayload().serialize();
                         if (payload != null) {
                             // 转发注册或注销请求给解析单点, 获取相应之后返回
-                            String responseType = queryType.equals("01") ? "03" : "04";
                             byte[] receive = SendAndRecv.throughUDP(IRS_NA, IRS_port, payload);
                             if (receive != null) {
                                 if (Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).startsWith("01", 2)) {
-                                    // 注册或注销成功，转发给BGP, 控制器不返回注册注销响应报文
-                                    nrsPkt.setPayload(new Data(payload));
-                                    nrsPkt.setQueryType(SocketUtil.hexStringToBytes(responseType)[0]);
+                                    // 注册或注销成功，改payload为格式2，转发给BGP, 控制器不返回注册注销响应报文
+                                    int total_len = 1 + 20 + 16 + 16 + 4 + BGP_NUM * 16;
+                                    ByteArrayOutputStream baos = new ByteArrayOutputStream(total_len);
+                                    try {
+                                        baos.write(Arrays.copyOfRange(payload, 0, 37));
+                                        baos.write(SocketUtil.hexStringToBytes(fromSwitchIP_hex));
+                                        baos.write(SocketUtil.int2Bytes(BGP_NUM));
+                                        for (int i = 0; i < BGP_NUM; i++) {
+                                            String BGP_NA = bgp_Na_List.get(i);
+                                            baos.write(SocketUtil.hexStringToBytes(HexUtil.ip2HexString(BGP_NA, 32)));
+                                        }
+                                    } catch (Exception e) {
+                                        log.error(e.getMessage());
+                                        e.printStackTrace();
+                                        return;
+                                    }
+                                    byte[] byteToBGP = baos.toByteArray();
+                                    Data payloadToBGP = new Data(byteToBGP);
+                                    nrsPkt.setPayload(payloadToBGP);
                                     idpPkt.setPayload(nrsPkt);
                                     ipv6Pkt.setPayload(idpPkt);
+                                    String BGP_NA = bgp_Na_List.get(0); // TODO: 2021/8/23 暂时从BGP列表中选取选取第一个发送
                                     ipv6Pkt.setDestinationAddress(SocketUtil.hexStringToBytes(HexUtil.ip2HexString(BGP_NA, 32)));
                                     ethPkt.setPayload(ipv6Pkt);
-                                    byte[] sourceMACAddress = ethPkt.getSourceMACAddress();
-                                    ethPkt.setSourceMACAddress(ethPkt.getDestinationMAC());
-                                    ethPkt.setDestinationMACAddress(sourceMACAddress);
                                 }
                             } else {
                                 log.warn("receive packets from IRS is null!");
                             }
                         }
-                    } else {
+                    } else if (queryType.equals("05") || queryType.equals("06")) {
                         // TODO: 2021/8/22 resolve
-                        String na = eid_na_map.get(dstEid);
+//                        String na = eid_na_map.get(dstEid);
                         //                        System.arraycopy(SocketUtil.hexStringToBytes(na), 0, ipv6PktByte, 24, 16);
+                        byte[] payload = nrsPkt.getPayload().serialize();
+                        // 发送给解析单点解析请求 TODO: 暂时未考虑tag解析
+                        String resolveMsg = "71" + "000000" + getRandomRequestID() + dstEid + getTimestamp();
+                        byte[] receive = SendAndRecv.throughUDP(IRS_NA, IRS_port, SocketUtil.hexStringToBytes(resolveMsg));
+                        String na = HexUtil.zeros(32);
+                        if (receive[1] == 1) {
+                            int na_num = SocketUtil.bytes2Int(Arrays.copyOfRange(receive, 12, 14), 0);
+                            if (na_num > 0) {
+                                // 解析成功，将返回的NA的第一个填入ipv6的dstIP字段 TODO：是否有选ip的策略？
+                                na = SocketUtil.bytesToHexString(Arrays.copyOfRange(receive, 34, 50));
+                            } else {
+                                // 解析不到
+                                String source = HexUtil.byte2HexString(nrsPkt.getSource());
+                                if (source.equals("00")) {
+                                    // 包是从客户端发来的
+                                    String BGP_NA = bgp_Na_List.get(0);
+                                    na = HexUtil.ip2HexString(BGP_NA, 32);
+                                } else if (source.equals("01")) {
+                                    // 包是从BGP发来的
+                                    nrsPkt.setQueryType(SocketUtil.hexStringToBytes("06")[0]);
+                                    nrsPkt.setNA(ipv6Pkt.getDestinationAddress());
+                                    na = fromSwitchIP_hex;
+                                    idpPkt.setPayload(nrsPkt);
+                                    ipv6Pkt.setPayload(idpPkt);
+                                } else {
+                                    log.error("packet source is unknown!");
+                                }
+                            }
+                        } else {
+                            // 解析失败会怎么处理？
+                            log.error("resolve in irs failed, maybe IRS cannot connect successfully");
+                        }
                         ipv6Pkt.setDestinationAddress(SocketUtil.hexStringToBytes(na));
                         ethPkt.setPayload(ipv6Pkt);
                         // TODO: 2021/8/16 是否下发流表项，下发策略？
@@ -663,6 +713,25 @@ public class SeanrsApp {
                 }
             }
         }
+    }
+
+    private String getRandomRequestID() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 8; i++) {
+            long ran = Math.round(Math.random() * 10);
+            sb.append(ran);
+        }
+        return sb.toString();
+    }
+
+    public static byte[] getRequestID() {
+        String requestIDString = UUID.randomUUID().toString().substring(0, 4);
+        return requestIDString.getBytes();
+    }
+
+    public static String getTimestamp() {
+        String time = Long.toHexString((System.currentTimeMillis()) / 1000);
+        return time.substring(time.length() - 8);
     }
 
 }

@@ -147,5 +147,13 @@ public class NRS extends BasePacket {
     public void setQueryType(byte queryType) {
         this.queryType = queryType;
     }
+
+    public void setBgpType(byte bgpType) {
+        this.bgpType = bgpType;
+    }
+
+    public void setSource(byte source) {
+        this.source = source;
+    }
 }
 
