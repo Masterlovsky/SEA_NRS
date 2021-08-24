@@ -165,6 +165,7 @@ public class SeanrsApp {
 
     @Deactivate
     public void deactivate(ComponentContext context) {
+        // TODO: 2021/8/24 app 下线时执行什么操作？ 
         instructionBlockSentCache.clear();
         instructionBlockInstalledCache.clear();
         flowEntrySentCache.clear();
@@ -215,6 +216,7 @@ public class SeanrsApp {
         trafficTreatmentBuilder.extension(new TableModTreatment(OFTableType.OF_MM_TABLE, DEFAULT_TABLE_SIZE, "NRSTable"), deviceId);
         PofFlowRuleBuilder builder = new PofFlowRuleBuilder();
         FlowRule flowRule = builder
+                .fromApp(appId)
                 .forDevice(deviceId)
                 .forTable(tableId)
                 .withSelector(trafficSelectorBuilder.build())
@@ -270,6 +272,7 @@ public class SeanrsApp {
         TrafficTreatment.Builder trafficTreatmentBuilder = DefaultTrafficTreatment.builder().extension(instructionBlockModTreatment, deviceId);
 
         FlowRule blockFlowRule = new PofFlowRuleBuilder()
+                .fromApp(appId)
                 .forDevice(deviceId)
                 .withTreatment(trafficTreatmentBuilder.build())
                 .build();
@@ -284,6 +287,7 @@ public class SeanrsApp {
         TrafficTreatment.Builder trafficTreatmentBuilder = DefaultTrafficTreatment.builder().extension(instructionBlockModTreatment, deviceId);
 
         FlowRule blockFlowRule = new PofFlowRuleBuilder()
+                .fromApp(appId)
                 .forDevice(deviceId)
                 .withTreatment(trafficTreatmentBuilder.build())
                 .build();
@@ -296,6 +300,7 @@ public class SeanrsApp {
         TrafficTreatment.Builder trafficTreatmentBuilder = DefaultTrafficTreatment.builder().extension(instructionBlockModTreatment, deviceId);
 
         FlowRule blockFlowRule = new PofFlowRuleBuilder()
+                .fromApp(appId)
                 .forDevice(deviceId)
                 .withTreatment(trafficTreatmentBuilder.build())
                 .build();
@@ -313,8 +318,8 @@ public class SeanrsApp {
             log.info("BuildOutputInstructionBlock Faild");
         }
 
-
         FlowRule blockFlowRule = new PofFlowRuleBuilder()
+                .fromApp(appId)
                 .forDevice(deviceId)
                 .withTreatment(trafficTreatmentBuilder.build())
                 .makeStored(false)
@@ -346,7 +351,7 @@ public class SeanrsApp {
         }
     }
 
-    private boolean allDefaultInstructionBlocksInstalled(DeviceId deviceId) {
+    private boolean allInstructionBlocksInstalled(DeviceId deviceId) {
         boolean instructionBlockInstalled;
         if (instructionBlockSentCache.size(deviceId) == 0) {
             return false;
@@ -554,7 +559,7 @@ public class SeanrsApp {
                                             //log.debug("INSTRUCTION_BLOCK_MOD instructionBlockSentCache.contains\n");
                                             instructionBlockInstalledCache.add(rule);
                                             //需要的默认指令块全部添加完毕，则下发表项; 如果该设备上的表项已经下发完成则不再下发
-                                            if (allDefaultInstructionBlocksInstalled(deviceId) && !getProcessStatusByDeviceId(deviceId)) {
+                                            if (allInstructionBlocksInstalled(deviceId) && !getProcessStatusByDeviceId(deviceId)) {
                                                 //log.debug("INSTRUCTION_BLOCK_MOD call onDefaultBlocksAddedByDevice,add default entries\n");
                                                 executor.execute(() -> {
                                                     addDefaultFlowEntry(deviceId);
@@ -699,9 +704,26 @@ public class SeanrsApp {
                         ethPkt.setPayload(ipv6Pkt);
                         // TODO: 2021/8/16 是否下发流表项，下发策略？
                         if (dstEid != null) {
-                            addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, na, SEANRS_TABLEID_IPV6, MobilityTableID_for_Ipv6);
-                            addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, na, SEANRS_TABLEID_Vlan, MobilityTableID_for_Vlan);
-                            addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, na, SEANRS_TABLEID_Qinq, MobilityTableID_for_Qinq);
+                            {
+                                FlowRule blockFlowRule = buildSetAddrAndGotoTableInstructionBlock(deviceId, 0, na, MobilityTableID_for_Ipv6);
+                                flowRuleService.applyFlowRules(blockFlowRule);
+                                instructionBlockSentCache.add(blockFlowRule);
+                            }
+                            {
+                                FlowRule blockFlowRule = buildSetAddrAndGotoTableInstructionBlock(deviceId, 4, na, MobilityTableID_for_Vlan);
+                                flowRuleService.applyFlowRules(blockFlowRule);
+                                instructionBlockSentCache.add(blockFlowRule);
+                            }
+                            {
+                                FlowRule blockFlowRule = buildSetAddrAndGotoTableInstructionBlock(deviceId, 8, na, MobilityTableID_for_Qinq);
+                                flowRuleService.applyFlowRules(blockFlowRule);
+                                instructionBlockSentCache.add(blockFlowRule);
+                            }
+                            if (allInstructionBlocksInstalled(deviceId)) {
+                                addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, na, SEANRS_TABLEID_IPV6, MobilityTableID_for_Ipv6);
+                                addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, na, SEANRS_TABLEID_Vlan, MobilityTableID_for_Vlan);
+                                addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, na, SEANRS_TABLEID_Qinq, MobilityTableID_for_Qinq);
+                            }
                         }
                     }
                     FlowModTreatment flowModTreatment = new FlowModTreatment(buildGotoTableInstructionBlock(deviceId, MobilityTableID_for_Ipv6).id().value());
