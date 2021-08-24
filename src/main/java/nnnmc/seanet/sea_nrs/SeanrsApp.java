@@ -6,6 +6,7 @@ import nnnmc.seanet.sea_nrs.protocol.NRS;
 import nnnmc.seanet.sea_nrs.util.HexUtil;
 import nnnmc.seanet.sea_nrs.util.SendAndRecv;
 import nnnmc.seanet.sea_nrs.util.SocketUtil;
+import nnnmc.seanet.sea_nrs.util.Util;
 import org.onlab.packet.Data;
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.IPv6;
@@ -275,8 +276,8 @@ public class SeanrsApp {
         return blockFlowRule;
     }
 
-    private FlowRule buildSetAddrAndGotoTableInstructionBlock(DeviceId deviceId, String ipAddress, int gotoTableId) {
-        OFMatch20 ofMatch20 = new OFMatch20(FieldId.PACKET, 24 * 8, 16 * 8);
+    private FlowRule buildSetAddrAndGotoTableInstructionBlock(DeviceId deviceId, int offset, String ipAddress, int gotoTableId) {
+        OFMatch20 ofMatch20 = new OFMatch20(FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 24 * 8, 16 * 8);
         InstructionBlockModTreatment instructionBlockModTreatment = new InstructionBlockModTreatment();
         instructionBlockModTreatment.addInstruction(new OFInstructionSetField(ofMatch20, ipAddress));
         instructionBlockModTreatment.addInstruction(new OFInstructionGotoTable(gotoTableId));
@@ -396,7 +397,7 @@ public class SeanrsApp {
         flowRuleService.applyFlowRules(flowRule);
     }
 
-    private void addSetIPDstAddrAndGoToTableFlowEntry(DeviceId deviceId, String eid, int tableId, int gotoTableId) {
+    private void addSetIPDstAddrAndGoToTableFlowEntry(DeviceId deviceId, String eid, String na, int tableId, int gotoTableId) {
         // packet offset
         int offset = 0;
         switch (tableId) {
@@ -418,8 +419,7 @@ public class SeanrsApp {
         trafficSelectorBuilder.extension(selector, deviceId);
 
         // construct treatment
-        String na = eid_na_map.getOrDefault(eid, HexUtil.duplicates('0', 32));
-        FlowModTreatment flowModTreatment = new FlowModTreatment(buildSetAddrAndGotoTableInstructionBlock(deviceId, na, gotoTableId).id().value());
+        FlowModTreatment flowModTreatment = new FlowModTreatment(buildSetAddrAndGotoTableInstructionBlock(deviceId, offset, na, gotoTableId).id().value());
         TrafficTreatment.Builder trafficTreatmentBuilder = DefaultTrafficTreatment.builder();
         trafficTreatmentBuilder.extension(flowModTreatment, deviceId);
 
@@ -615,7 +615,7 @@ public class SeanrsApp {
 //                System.arraycopy(ipv6PktByte, 64, dstEidByte, 0, 20);
                 IDP idpPkt = (IDP) ipv6Pkt.getPayload();
                 String nextHeader = HexUtil.byte2HexString(idpPkt.getNextHeader());
-                String srcEid = SocketUtil.bytesToHexString(idpPkt.getSourceEID());
+//                String srcEid = SocketUtil.bytesToHexString(idpPkt.getSourceEID());
                 String dstEid = SocketUtil.bytesToHexString(idpPkt.getDestEID());
                 // 处理网内解析请求 0x10
                 if (nextHeader.equals("10")) {
@@ -661,17 +661,18 @@ public class SeanrsApp {
                     } else if (queryType.equals("05") || queryType.equals("06")) {
                         // TODO: 2021/8/22 resolve
 //                        String na = eid_na_map.get(dstEid);
-                        //                        System.arraycopy(SocketUtil.hexStringToBytes(na), 0, ipv6PktByte, 24, 16);
+                        // System.arraycopy(SocketUtil.hexStringToBytes(na), 0, ipv6PktByte, 24, 16);
                         byte[] payload = nrsPkt.getPayload().serialize();
                         // 发送给解析单点解析请求 TODO: 暂时未考虑tag解析
-                        String resolveMsg = "71" + "000000" + getRandomRequestID() + dstEid + getTimestamp();
+                        String resolveMsg = "71" + "000000" + Util.getRandomRequestID() + dstEid + Util.getTimestamp();
                         byte[] receive = SendAndRecv.throughUDP(IRS_NA, IRS_port, SocketUtil.hexStringToBytes(resolveMsg));
                         String na = HexUtil.zeros(32);
                         if (receive[1] == 1) {
                             int na_num = SocketUtil.bytes2Int(Arrays.copyOfRange(receive, 12, 14), 0);
                             if (na_num > 0) {
-                                // 解析成功，将返回的NA的第一个填入ipv6的dstIP字段 TODO：是否有选ip的策略？
+                                // 解析成功!，将返回的NA的第一个填入ipv6的dstIP字段 TODO：是否有选ip的策略？
                                 na = SocketUtil.bytesToHexString(Arrays.copyOfRange(receive, 34, 50));
+//                                eid_na_map.put(dstEid, na);
                             } else {
                                 // 解析不到
                                 String source = HexUtil.byte2HexString(nrsPkt.getSource());
@@ -698,9 +699,9 @@ public class SeanrsApp {
                         ethPkt.setPayload(ipv6Pkt);
                         // TODO: 2021/8/16 是否下发流表项，下发策略？
                         if (dstEid != null) {
-                            addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, SEANRS_TABLEID_IPV6, MobilityTableID_for_Ipv6);
-                            addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, SEANRS_TABLEID_Vlan, MobilityTableID_for_Vlan);
-                            addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, SEANRS_TABLEID_Qinq, MobilityTableID_for_Qinq);
+                            addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, na, SEANRS_TABLEID_IPV6, MobilityTableID_for_Ipv6);
+                            addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, na, SEANRS_TABLEID_Vlan, MobilityTableID_for_Vlan);
+                            addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, na, SEANRS_TABLEID_Qinq, MobilityTableID_for_Qinq);
                         }
                     }
                     FlowModTreatment flowModTreatment = new FlowModTreatment(buildGotoTableInstructionBlock(deviceId, MobilityTableID_for_Ipv6).id().value());
@@ -711,27 +712,13 @@ public class SeanrsApp {
                     bf.put(outPutBytes).flip();
                     packetService.emit(new DefaultOutboundPacket(deviceId, builder.build(), bf));
                 }
+                // 不是网内解析请求则不处理
+                else {
+                    log.info("receive a SeaDP packet without nrs header, go to next processor");
+                }
             }
         }
     }
 
-    private String getRandomRequestID() {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < 8; i++) {
-            long ran = Math.round(Math.random() * 10);
-            sb.append(ran);
-        }
-        return sb.toString();
-    }
-
-    public static byte[] getRequestID() {
-        String requestIDString = UUID.randomUUID().toString().substring(0, 4);
-        return requestIDString.getBytes();
-    }
-
-    public static String getTimestamp() {
-        String time = Long.toHexString((System.currentTimeMillis()) / 1000);
-        return time.substring(time.length() - 8);
-    }
 
 }
