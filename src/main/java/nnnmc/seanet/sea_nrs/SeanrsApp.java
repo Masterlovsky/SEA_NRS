@@ -11,6 +11,7 @@ import org.onlab.packet.Data;
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.IPv6;
 import org.onlab.packet.IpAddress;
+import org.onlab.util.Tools;
 import org.onosproject.cfg.ComponentConfigService;
 import org.onosproject.cluster.ClusterService;
 import org.onosproject.cluster.NodeId;
@@ -41,35 +42,24 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import static nnnmc.seanet.sea_nrs.OsgiPropertyConstants.*;
 import static org.onlab.util.Tools.groupedThreads;
 
 
-@Component(immediate = true)
+@Component(immediate = true,
+        property = {
+                NRS_TABLE_BASE_ID + ":Integer=" + NRS_TABLE_BASE_ID_DEFAULT,
+                MOBILITY_TABLE_BASE_ID + ":Integer=" + MOBILITY_TABLE_BASE_ID_DEFAULT,
+                "tableSize" + ":Integer=" + SIZE_DEFAULT,
+                "irs_na" + ":String=" + IRS_NA_DEFAULT,
+                "irs_port" + ":Integer=" + IRS_PORT_DEFAULT,
+                "bgp_num" + ":Integer=" + BGP_NUM_DEFAULT,
+                "bgp_na" + ":String=" + BGP_NA
+        }
+)
 public class SeanrsApp {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
-
-    private static final int DISTRIBUTOR_TABLEID = 0;
-    private static final int SEANRS_TABLEID_IPV6 = 1;
-    private static final int SEANRS_TABLEID_Vlan = 11;
-    private static final int SEANRS_TABLEID_Qinq = 21;
-    private static final int DEFAULT_TABLE_SIZE = 65535;
-    private static final int DEFAULT_PRIORITY = 1000;
-    private static final int PKTIN_PRIORITY = 2000;
-    private static final int FORWARD_PRIORITY = 5000;
-    private static final int ETH_HEADER_LEN = 14 * 8;
-    private static final int forwardTableId_for_Ipv6 = 6;
-    private static final int forwardTableId_for_Vlan = 16;
-    private static final int forwardTableId_for_Qinq = 26;
-    private static final int MobilityTableID_for_Ipv6 = 2;
-    private static final int MobilityTableID_for_Vlan = 12;
-    private static final int MobilityTableID_for_Qinq = 22;
-    private static final String NA_ZEROS = HexUtil.zeros(32);
-    private static final String EID_ZEROS = HexUtil.zeros(40);
-    private static final String IRS_NA = "192.168.47.200";
-    private static List<String> bgp_Na_List = new ArrayList<>();
-    private static final int BGP_NUM = 1;
-    private static final int IRS_port = 10061;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected FlowRuleService flowRuleService;
@@ -98,22 +88,42 @@ public class SeanrsApp {
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected FlowRuleStore store;
 
-    private FlowRuleCache instructionBlockSentCache = new FlowRuleCache();
-    private FlowRuleCache instructionBlockInstalledCache = new FlowRuleCache();
-    private FlowRuleCache flowEntrySentCache = new FlowRuleCache();
-    private FlowRuleCache tableSentCache = new FlowRuleCache();
-    private FlowRuleCache tableInstalledCache = new FlowRuleCache();
+    private static final int SEANRS_TABLEID_IPV6 = NRS_TABLE_BASE_ID_DEFAULT;
+    private static final int SEANRS_TABLEID_Vlan = NRS_TABLE_BASE_ID_DEFAULT + 10;
+    private static final int SEANRS_TABLEID_Qinq = NRS_TABLE_BASE_ID_DEFAULT + 20;
+    private static final int MobilityTableID_for_Ipv6 = MOBILITY_TABLE_BASE_ID_DEFAULT;
+    private static final int MobilityTableID_for_Vlan = MOBILITY_TABLE_BASE_ID_DEFAULT + 10;
+    private static final int MobilityTableID_for_Qinq = MOBILITY_TABLE_BASE_ID_DEFAULT + 20;
+    private static final int DEFAULT_PRIORITY = 1000;
+    private static final int PKTIN_PRIORITY = 2000;
+    private static final int FORWARD_PRIORITY = 5000;
+    private static final int ETH_HEADER_LEN = 14 * 8;
+    private static final String NA_ZEROS = HexUtil.zeros(32);
+    private static int DEFAULT_TABLE_SIZE = SIZE_DEFAULT;
+    private static String IRS_NA = IRS_NA_DEFAULT;
+    private static int IRS_port = IRS_PORT_DEFAULT;
+    private static final List<String> bgp_Na_List = new ArrayList<>();
+    private static int BGP_NUM = BGP_NUM_DEFAULT;
+    private static String BGP_NA_String = BGP_NA;
+
+    private final FlowRuleCache instructionBlockSentCache = new FlowRuleCache();
+    private final FlowRuleCache instructionBlockInstalledCache = new FlowRuleCache();
+    private final FlowRuleCache flowEntrySentCache = new FlowRuleCache();
+    private final FlowRuleCache tableSentCache = new FlowRuleCache();
+    private final FlowRuleCache tableInstalledCache = new FlowRuleCache();
 
     private final SeaNRSFlowRuleListener flowRuleListener = new SeaNRSFlowRuleListener();
-    private SeaNRSPacketProcessor processor = new SeaNRSPacketProcessor();
-
+    private final SeaNRSPacketProcessor processor = new SeaNRSPacketProcessor();
 
     private ExecutorService executor;
 
-    private HashMap<String, String> eid_na_map = new HashMap<>();
-
     private void readComponentConfiguration(ComponentContext context) {
         Dictionary<?, ?> properties = context.getProperties();
+        IRS_NA = Tools.get(properties, "irs_na");
+        BGP_NUM = Tools.getIntegerProperty(properties, "bgp_num", BGP_NUM_DEFAULT);
+        IRS_port = Tools.getIntegerProperty(properties, "irs_port", IRS_PORT_DEFAULT);
+        DEFAULT_TABLE_SIZE = Tools.getIntegerProperty(properties, "tableSize", SIZE_DEFAULT);
+        BGP_NA_String = Tools.get(properties, "bgp_na");
     }
 
 
@@ -128,10 +138,7 @@ public class SeanrsApp {
     @Activate
     public void activate(ComponentContext context) {
 //        for test: ---------------------
-        eid_na_map.put("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "99999999999999999999999999999999");
-        eid_na_map.put("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbc", "99999999999999999999999999999999");
-        eid_na_map.put("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbd", "99999999999999999999999999999999");
-        bgp_Na_List.add(HexUtil.ip2HexString("192.168.47.198", 32));
+        bgp_Na_List.addAll(Arrays.asList(BGP_NA_String.split(",")));
 //        -------------------------
         appId = coreService.registerApplication("org.onosproject.sea_nrs");
         local = clusterService.getLocalNode().id();
@@ -368,8 +375,10 @@ public class SeanrsApp {
         switch (tableId) {
             case SEANRS_TABLEID_Vlan:
                 offset = 4;
+                break;
             case SEANRS_TABLEID_Qinq:
                 offset = 8;
+                break;
             default:
                 break;
         }
@@ -408,8 +417,10 @@ public class SeanrsApp {
         switch (tableId) {
             case SEANRS_TABLEID_Vlan:
                 offset = 4;
+                break;
             case SEANRS_TABLEID_Qinq:
                 offset = 8;
+                break;
             default:
                 break;
         }
@@ -448,8 +459,10 @@ public class SeanrsApp {
         switch (tableId) {
             case SEANRS_TABLEID_Vlan:
                 offset = 4;
+                break;
             case SEANRS_TABLEID_Qinq:
                 offset = 8;
+                break;
             default:
                 break;
         }
@@ -501,24 +514,20 @@ public class SeanrsApp {
      * 下发过则调用processedSetAdd函数将其记录在processedDeviceIdSet中；
      * 当设备下线后，调用resetStatusByDeviceId函数，将该设备的DeviceId从processedDeviceIdSet中移出。以此来避免重复下发表项
      */
-    private final CopyOnWriteArraySet<DeviceId> processedDeviceIdSet = new CopyOnWriteArraySet<DeviceId>();
+    private final CopyOnWriteArraySet<DeviceId> processedDeviceIdSet = new CopyOnWriteArraySet<>();
 
     public synchronized void processedSetAdd(DeviceId deviceId) {
         processedDeviceIdSet.add(deviceId);
     }
 
     public synchronized void resetStatusByDeviceId(DeviceId deviceId) {
-        if (!processedDeviceIdSet.isEmpty() && processedDeviceIdSet.contains(deviceId)) {
+        if (!processedDeviceIdSet.isEmpty()) {
             processedDeviceIdSet.remove(deviceId);
         }
     }
 
     public synchronized boolean getProcessStatusByDeviceId(DeviceId deviceId) {
-        boolean processed = false;
-        if (!processedDeviceIdSet.isEmpty() && processedDeviceIdSet.contains(deviceId)) {
-            processed = true;
-        }
-
+        boolean processed = !processedDeviceIdSet.isEmpty() && processedDeviceIdSet.contains(deviceId);
         return processed;
     }
 
@@ -530,7 +539,6 @@ public class SeanrsApp {
         @Override
         public void event(FlowRuleEvent event) {
             FlowRule rule = event.subject();
-            int tableId = rule.tableId();
             switch (event.type()) {
                 //case RULE_ADDED:
                 //case RULE_UPDATED:
@@ -545,9 +553,7 @@ public class SeanrsApp {
                                     if (tableSentCache.contains(rule)) {
                                         tableInstalledCache.add(rule);
                                         if (allNRSTablesInstalled(deviceId) && (instructionBlockSentCache.size(deviceId) == 0)) {
-                                            executor.execute(() -> {
-                                                addDefaultInstructionBlock(deviceId);
-                                            });
+                                            executor.execute(() -> addDefaultInstructionBlock(deviceId));
                                         }
                                     }
                                 }
@@ -615,13 +621,15 @@ public class SeanrsApp {
                 log.info("receive UDP packet, content: {}", SocketUtil.bytesToHexString(ipv6Pkt.serialize()));
             } else if (nextHdr == 0x99) {
                 // TODO: 2021/7/27 IDP 暂定使用扩展包头的方式
-//                byte[] ipv6PktByte = ipv6Pkt.serialize();
-//                byte idpNextHeader = ipv6PktByte[40]; // 网内解析匹配字段，0x10
-//                byte[] idpReserved = {ipv6PktByte[42], ipv6PktByte[43]}; //
-//                byte[] srcEidByte = new byte[20];
-//                System.arraycopy(ipv6PktByte, 44, srcEidByte, 0, 20);
-//                byte[] dstEidByte = new byte[20];
-//                System.arraycopy(ipv6PktByte, 64, dstEidByte, 0, 20);
+                /*
+                byte[] ipv6PktByte = ipv6Pkt.serialize();
+                byte idpNextHeader = ipv6PktByte[40]; // 网内解析匹配字段，0x10
+                byte[] idpReserved = {ipv6PktByte[42], ipv6PktByte[43]}; //
+                byte[] srcEidByte = new byte[20];
+                System.arraycopy(ipv6PktByte, 44, srcEidByte, 0, 20);
+                byte[] dstEidByte = new byte[20];
+                System.arraycopy(ipv6PktByte, 64, dstEidByte, 0, 20);
+                */
                 IDP idpPkt = (IDP) ipv6Pkt.getPayload();
                 String nextHeader = HexUtil.byte2HexString(idpPkt.getNextHeader());
                 String dstEid = SocketUtil.bytesToHexString(idpPkt.getDestEID());
