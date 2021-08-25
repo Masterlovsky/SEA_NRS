@@ -131,7 +131,7 @@ public class SeanrsApp {
         eid_na_map.put("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "99999999999999999999999999999999");
         eid_na_map.put("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbc", "99999999999999999999999999999999");
         eid_na_map.put("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbd", "99999999999999999999999999999999");
-        bgp_Na_List.add("192.168.47.198");
+        bgp_Na_List.add(HexUtil.ip2HexString("192.168.47.198", 32));
 //        -------------------------
         appId = coreService.registerApplication("org.onosproject.sea_nrs");
         local = clusterService.getLocalNode().id();
@@ -158,7 +158,7 @@ public class SeanrsApp {
                 }
             }
         }
-        packetService.addProcessor(processor, PacketProcessor.director(100));
+        packetService.addProcessor(processor, PacketProcessor.director(100)); // todo: 看一下其他业务的priority
         log.info("============== Sea_NRS app activate! ==============");
     }
 
@@ -172,6 +172,7 @@ public class SeanrsApp {
         tableSentCache.clear();
         tableInstalledCache.clear();
 
+        flowRuleService.removeFlowRulesById(appId);
         packetService.removeProcessor(processor);
         flowRuleService.removeListener(flowRuleListener);
 
@@ -222,7 +223,6 @@ public class SeanrsApp {
                 .withSelector(trafficSelectorBuilder.build())
                 .withTreatment(trafficTreatmentBuilder.build())
                 .build();
-        tableSentCache.add(flowRule);
         return flowRule;
     }
 
@@ -280,7 +280,7 @@ public class SeanrsApp {
     }
 
     private FlowRule buildSetAddrAndGotoTableInstructionBlock(DeviceId deviceId, int offset, String ipAddress, int gotoTableId) {
-        OFMatch20 ofMatch20 = new OFMatch20(FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 24 * 8, 16 * 8);
+        OFMatch20 ofMatch20 = new OFMatch20(FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 24 * 8, 16 * 8); // IPv6 dstAddr
         InstructionBlockModTreatment instructionBlockModTreatment = new InstructionBlockModTreatment();
         instructionBlockModTreatment.addInstruction(new OFInstructionSetField(ofMatch20, ipAddress));
         instructionBlockModTreatment.addInstruction(new OFInstructionGotoTable(gotoTableId));
@@ -588,6 +588,10 @@ public class SeanrsApp {
             if (context.isHandled()) {
                 return;
             }
+            nrsPacketInProcess(context);
+        }
+
+        private void nrsPacketInProcess(PacketContext context) {
             InboundPacket pkt = context.inPacket();
             ConnectPoint ingressPort = pkt.receivedFrom();
             Interface anInterface = interfaceService.getInterfacesByPort(ingressPort).stream().findFirst().orElse(null);
@@ -596,7 +600,7 @@ public class SeanrsApp {
             String fromSwitchIP_hex = HexUtil.ip2HexString(fromSwitchIP, 32);
             DeviceId deviceId = ingressPort.deviceId();
             Ethernet ethPkt = pkt.parsed();
-            // TODO: 2021/8/22 Vlan 和 Qinq 先不处理 
+            // TODO: 2021/8/22 Vlan 和 Qinq 先不处理
             short pkt_type = ethPkt.getEtherType();
             if (pkt_type == Ethernet.TYPE_VLAN) {
                 return;
@@ -620,18 +624,20 @@ public class SeanrsApp {
 //                System.arraycopy(ipv6PktByte, 64, dstEidByte, 0, 20);
                 IDP idpPkt = (IDP) ipv6Pkt.getPayload();
                 String nextHeader = HexUtil.byte2HexString(idpPkt.getNextHeader());
-//                String srcEid = SocketUtil.bytesToHexString(idpPkt.getSourceEID());
                 String dstEid = SocketUtil.bytesToHexString(idpPkt.getDestEID());
                 // 处理网内解析请求 0x10
                 if (nextHeader.equals("10")) {
                     NRS nrsPkt = (NRS) idpPkt.getPayload();
                     String queryType = HexUtil.byte2HexString(nrsPkt.getQueryType());
+
+                    // TODO: 2021/8/22 register or deregister
                     if (queryType.equals("01") || queryType.equals("02")) {
-                        // TODO: 2021/8/22 register or deregister
+                        boolean flag = true; // 标记在控制器上是否注册成功
                         byte[] payload = nrsPkt.getPayload().serialize();
                         if (payload != null) {
-                            // 转发注册或注销请求给解析单点, 获取相应之后返回
-                            byte[] receive = SendAndRecv.throughUDP(IRS_NA, IRS_port, payload);
+                            // 转发注册或注销请求给解析单点, 获取响应之后返回
+                            String sendToIRSMsg = Util.msgFormat1ToIRSFormat(SocketUtil.bytesToHexString(payload));
+                            byte[] receive = SendAndRecv.throughUDP(IRS_NA, IRS_port, SocketUtil.hexStringToBytes(sendToIRSMsg));
                             if (receive != null) {
                                 if (Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).startsWith("01", 2)) {
                                     // 注册或注销成功，改payload为格式2，转发给BGP, 控制器不返回注册注销响应报文
@@ -658,16 +664,61 @@ public class SeanrsApp {
                                     String BGP_NA = bgp_Na_List.get(0); // TODO: 2021/8/23 暂时从BGP列表中选取选取第一个发送
                                     ipv6Pkt.setDestinationAddress(SocketUtil.hexStringToBytes(HexUtil.ip2HexString(BGP_NA, 32)));
                                     ethPkt.setPayload(ipv6Pkt);
+                                } else {
+                                    flag = false;
+                                    log.error("Receive IRS register/deregister response status is not success");
                                 }
                             } else {
-                                log.warn("receive packets from IRS is null!");
+                                flag = false;
+                                log.error("Receive packets from IRS is null!");
+                            }
+                        } else {
+                            flag = false;
+                            log.error("Register message format is wrong, nrs payload is null!");
+                        }
+                        // 如果注册/注销不成功，向用户发送注册/注销失败响应格式1
+                        if (!flag) {
+                            byte[] payload_format1 = new byte[38];
+                            if (payload != null) {
+                                String type = Objects.requireNonNull(SocketUtil.bytesToHexString(payload)).startsWith("6f") ? "70" : "74";
+                                System.arraycopy(SocketUtil.hexStringToBytes(type), 0, payload_format1, 0, 1);
+                                System.arraycopy(SocketUtil.hexStringToBytes("00"), 0, payload_format1, 1, 1); // TODO: 2021/8/25 假设"00"表示失败
+                                System.arraycopy(payload, 1, payload_format1, 2, 36);
+                            }
+                            nrsPkt.setPayload(new Data(payload_format1));
+                            nrsPkt.setSource((byte) 0x01);
+                            nrsPkt.setQueryType(SocketUtil.hexStringToBytes(queryType.equals("01") ? "03" : "04")[0]);
+                            idpPkt.setPayload(nrsPkt);
+                            ipv6Pkt.setPayload(idpPkt);
+                            ipv6Pkt.setDestinationAddress(ipv6Pkt.getSourceAddress());
+                            ipv6Pkt.setSourceAddress(SocketUtil.hexStringToBytes(fromSwitchIP_hex));
+                            ethPkt.setPayload(ipv6Pkt);
+                        }
+                    }
+                    // TODO: 2021/8/25 register response or deregister response
+                    else if (queryType.equals("03") || queryType.equals("04")) {
+                        byte[] payload = nrsPkt.getPayload().serialize();
+                        if (payload != null && nrsPkt.getSource() == 0x01) {
+                            // 收到BGP发来的注册/注销失败响应报文，反操作注册注销
+                            String sendToIRSMsg = Util.msgFormat2ToIRSFormat(SocketUtil.bytesToHexString(payload));
+                            byte[] receive = SendAndRecv.throughUDP(IRS_NA, IRS_port, SocketUtil.hexStringToBytes(sendToIRSMsg));
+                            if (receive != null && Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).startsWith("01", 2)) {
+                                // 转发给用户注册/注销失败响应报文，响应报文格式1
+                                byte[] payload_format1 = new byte[38];
+                                System.arraycopy(payload, 0, payload_format1, 0, payload_format1.length);
+                                nrsPkt.setPayload(new Data(payload_format1));
+                                idpPkt.setPayload(nrsPkt);
+                                ipv6Pkt.setDestinationAddress(Arrays.copyOfRange(payload, 22, 38));
+                                ipv6Pkt.setPayload(idpPkt);
+                                ethPkt.setPayload(ipv6Pkt);
+                            } else {
+                                log.error("IRS don't response correctly");
                             }
                         }
-                    } else if (queryType.equals("05") || queryType.equals("06")) {
-                        // TODO: 2021/8/22 resolve
-//                        String na = eid_na_map.get(dstEid);
-                        // System.arraycopy(SocketUtil.hexStringToBytes(na), 0, ipv6PktByte, 24, 16);
-                        byte[] payload = nrsPkt.getPayload().serialize();
+                    }
+                    // TODO: 2021/8/22 resolve
+                    else if (queryType.equals("05")) {
+//                        byte[] payload = nrsPkt.getPayload().serialize();
                         // 发送给解析单点解析请求 TODO: 暂时未考虑tag解析
                         String resolveMsg = "71" + "000000" + Util.getRandomRequestID() + dstEid + Util.getTimestamp();
                         byte[] receive = SendAndRecv.throughUDP(IRS_NA, IRS_port, SocketUtil.hexStringToBytes(resolveMsg));
@@ -688,8 +739,8 @@ public class SeanrsApp {
                                 } else if (source.equals("01")) {
                                     // 包是从BGP发来的
                                     nrsPkt.setQueryType(SocketUtil.hexStringToBytes("06")[0]);
-                                    nrsPkt.setNA(ipv6Pkt.getDestinationAddress());
-                                    na = fromSwitchIP_hex;
+                                    nrsPkt.setNA(SocketUtil.hexStringToBytes(fromSwitchIP_hex));
+                                    na = bgp_Na_List.get(0); // TODO: 2021/8/24 这里我怎么知道哪个BGP给我发的请求？
                                     idpPkt.setPayload(nrsPkt);
                                     ipv6Pkt.setPayload(idpPkt);
                                 } else {
