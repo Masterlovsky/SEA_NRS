@@ -152,6 +152,7 @@ public class SeanrsApp {
         tableSentCache.clear();
         tableInstalledCache.clear();
 
+        componentConfigService.registerProperties(getClass());
         modified(context);
         //Send flow tables to the switches that have been connected
         for (Device device : deviceService.getAvailableDevices()) {
@@ -172,24 +173,43 @@ public class SeanrsApp {
 
     @Deactivate
     public void deactivate(ComponentContext context) {
-        // TODO: 2021/8/24 app 下线时执行什么操作？ 
-        instructionBlockSentCache.clear();
-        instructionBlockInstalledCache.clear();
-        flowEntrySentCache.clear();
-        tableSentCache.clear();
-        tableInstalledCache.clear();
+        //Before stopping the application, we first need to delete the entry delivered by the application on the switch
+        for (Device device : deviceService.getAvailableDevices()) {
+            DeviceId deviceId = device.id();
+            NodeId master = mastershipService.getMasterFor(deviceId);
+            if (Objects.equals(local, master)) {
+                removeOldFlowRules(deviceId);
+            }
+        }
 
         flowRuleService.removeFlowRulesById(appId);
         packetService.removeProcessor(processor);
         flowRuleService.removeListener(flowRuleListener);
 
+        componentConfigService.unregisterProperties(getClass(), false);
+        executor.shutdown();
+
         log.info("================= Sea_NRS app deactivate =================");
+    }
+
+    private void removeOldFlowRules(DeviceId deviceId) {
+        try {
+            Set<FlowRule> entryRemoveSet = flowEntrySentCache.remove(deviceId);
+            if ((entryRemoveSet != null) && (!entryRemoveSet.isEmpty())) {
+                for (FlowRule flowRule : entryRemoveSet) {
+                    flowRuleService.removeFlowRules(flowRule);
+                    log.debug("removeOldFlowRules in {}, removeFlowRules {}!", deviceId, flowRule);
+                }
+            }
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+        }
     }
 
     // =================== Flow Tables =======================
 
     private void buildNRSTables(DeviceId deviceId) {
-        log.debug("{} : NRS buildTable begin", deviceId);
+        log.debug("========== build NRS Table begin for device {} ==========", deviceId);
         {
             FlowRule table1 = createNRSTable(deviceId, SEANRS_TABLEID_IPV6, 0);//ipv6
             flowRuleService.applyFlowRules(table1);
@@ -209,7 +229,7 @@ public class SeanrsApp {
     }
 
     private FlowRule createNRSTable(DeviceId deviceId, int tableId, int offset) {
-        log.info("createNRSTable {} begin", deviceId);
+        log.info("---------- createNRSTable{}, in {} begin ----------", tableId, deviceId);
 
         OFMatch20Selector selector = new OFMatch20Selector();
         selector.addOFMatch20(FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 24 * 8, 16 * 8); // DEST_IPV6_ADDR
@@ -266,13 +286,14 @@ public class SeanrsApp {
             return false;
         }
         tableInstalled = tableSentCache.contrains(tableInstalledCache, deviceId);
-
+        if (tableInstalled) log.info("------- NRS tables installed -------");
         return tableInstalled;
     }
 
     // ================= Instruction Block =================
 
     private FlowRule buildPacketInInstructionBlock(DeviceId deviceId) {
+        log.debug("---------- build packetIn instruction block for {} ----------", deviceId);
         InstructionBlockModTreatment instructionBlockModTreatment = new InstructionBlockModTreatment();
 
         instructionBlockModTreatment.addInstruction(new OFInstructionPacketIn());
@@ -287,6 +308,7 @@ public class SeanrsApp {
     }
 
     private FlowRule buildSetAddrAndGotoTableInstructionBlock(DeviceId deviceId, int offset, String ipAddress, int gotoTableId) {
+        log.debug("---------- build SetAddr&GotoTable instruction block for {} ----------", deviceId);
         OFMatch20 ofMatch20 = new OFMatch20(FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 24 * 8, 16 * 8); // IPv6 dstAddr
         InstructionBlockModTreatment instructionBlockModTreatment = new InstructionBlockModTreatment();
         instructionBlockModTreatment.addInstruction(new OFInstructionSetField(ofMatch20, ipAddress));
@@ -302,6 +324,7 @@ public class SeanrsApp {
     }
 
     private FlowRule buildGotoTableInstructionBlock(DeviceId deviceId, int gotoTableId) {
+        log.debug("---------- build GotoTable{} instruction block for {} ----------", gotoTableId, deviceId);
         InstructionBlockModTreatment instructionBlockModTreatment = new InstructionBlockModTreatment();
         instructionBlockModTreatment.addInstruction(new OFInstructionGotoTable(gotoTableId));
         TrafficTreatment.Builder trafficTreatmentBuilder = DefaultTrafficTreatment.builder().extension(instructionBlockModTreatment, deviceId);
@@ -336,6 +359,7 @@ public class SeanrsApp {
     }
 
     private void addDefaultInstructionBlock(DeviceId deviceId) {
+        log.debug("========== add default instruction block for {} ==========", deviceId);
         {
             FlowRule blockFlowRule = buildPacketInInstructionBlock(deviceId);
             flowRuleService.applyFlowRules(blockFlowRule);
@@ -364,12 +388,14 @@ public class SeanrsApp {
             return false;
         }
         instructionBlockInstalled = instructionBlockSentCache.contrains(instructionBlockInstalledCache, deviceId);
+        if (instructionBlockInstalled) log.info("------- NRS instruction blocks installed -------");
         return instructionBlockInstalled;
     }
 
     // =================== Flow Entries ======================
 
     private void addPacketInFlowEntry(DeviceId deviceId, int tableId) {
+        log.debug("---------- add PacketIn flow entry for table{}, device:{} ----------", tableId, deviceId);
         // packet offset
         int offset = 0;
         switch (tableId) {
@@ -408,10 +434,12 @@ public class SeanrsApp {
                 .makePermanent()
                 .makeStored(false)
                 .build();
+        flowEntrySentCache.add(flowRule);
         flowRuleService.applyFlowRules(flowRule);
     }
 
     private void addSetIPDstAddrAndGoToTableFlowEntry(DeviceId deviceId, String eid, String na, int tableId, int gotoTableId) {
+        log.debug("---------- add Set IPDstAddr And GoToTable flow entry for table{}, device:{} ----------", tableId, deviceId);
         // packet offset
         int offset = 0;
         switch (tableId) {
@@ -449,11 +477,12 @@ public class SeanrsApp {
                 .makePermanent() // TODO: 2021/8/20 这个地方后面要改成软超时，暂时先用永久表项
                 .makeStored(false)
                 .build();
-
+        flowEntrySentCache.add(flowRule);
         flowRuleService.applyFlowRules(flowRule);
     }
 
     private void addDefaultGoToTableFlowEntry(DeviceId deviceId, int tableId, int goToTableId) {
+        log.debug("---------- add default GoToTable flow entry for table{}, device:{} ----------", tableId, deviceId);
         // packet offset
         int offset = 0;
         switch (tableId) {
@@ -491,10 +520,12 @@ public class SeanrsApp {
                 .makePermanent()
                 .makeStored(false)
                 .build();
+        flowEntrySentCache.add(flowRule);
         flowRuleService.applyFlowRules(flowRule);
     }
 
     private void addDefaultFlowEntry(DeviceId deviceId) {
+        log.debug("========== add default flow entry for device:{} ==========", deviceId);
         try {
             addPacketInFlowEntry(deviceId, SEANRS_TABLEID_IPV6);
             addPacketInFlowEntry(deviceId, SEANRS_TABLEID_Vlan);
