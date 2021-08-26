@@ -665,8 +665,8 @@ public class SeanrsApp {
                                         return;
                                     }
                                     byte[] byteToBGP = baos.toByteArray();
-                                    Data payloadToBGP = new Data(byteToBGP);
-                                    nrsPkt.setPayload(payloadToBGP);
+                                    nrsPkt.setPayload(new Data(byteToBGP));
+                                    nrsPkt.setSource((byte) 0x01);
                                     idpPkt.setPayload(nrsPkt);
                                     ipv6Pkt.setPayload(idpPkt);
                                     String BGP_NA = bgp_Na_List.get(0); // TODO: 2021/8/23 暂时从BGP列表中选取选取第一个发送
@@ -694,7 +694,6 @@ public class SeanrsApp {
                                 System.arraycopy(payload, 1, payload_format1, 2, 36);
                             }
                             nrsPkt.setPayload(new Data(payload_format1));
-                            nrsPkt.setSource((byte) 0x01);
                             nrsPkt.setQueryType(SocketUtil.hexStringToBytes(queryType.equals("01") ? "03" : "04")[0]);
                             idpPkt.setPayload(nrsPkt);
                             ipv6Pkt.setPayload(idpPkt);
@@ -715,6 +714,7 @@ public class SeanrsApp {
                                 byte[] payload_format1 = new byte[38];
                                 System.arraycopy(payload, 0, payload_format1, 0, payload_format1.length);
                                 nrsPkt.setPayload(new Data(payload_format1));
+                                nrsPkt.setSource((byte) 0x00);
                                 idpPkt.setPayload(nrsPkt);
                                 ipv6Pkt.setDestinationAddress(Arrays.copyOfRange(payload, 22, 38));
                                 ipv6Pkt.setPayload(idpPkt);
