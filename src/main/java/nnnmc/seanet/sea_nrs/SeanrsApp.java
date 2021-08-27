@@ -139,20 +139,9 @@ public class SeanrsApp {
     public void activate(ComponentContext context) {
 //        for test: ---------------------
         bgp_Na_List.addAll(Arrays.asList(BGP_NA_String.split(",")));
-        byte[] bytes = null;
-        try {
-            bytes = SendAndRecv.throughUDP(HexUtil.ip2HexString("2400:dd01:1037:201:192:168:47:191", 32), 10061,
-                    SocketUtil.hexStringToBytes("7100000663653962bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb5f5896b3010101020102"));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        log.info("try to send to 2400:dd01:1037:201:192:168:47:191 udp eid resolve msg, receive is: {}", SocketUtil.bytesToHexString(bytes));
 //        -------------------------
         appId = coreService.registerApplication("org.onosproject.sea_nrs");
         local = clusterService.getLocalNode().id();
-
-        executor = Executors.newSingleThreadExecutor(groupedThreads("onos/seanet/sea_nrs", "main", log));
-        flowRuleService.addListener(flowRuleListener);
 
         instructionBlockSentCache.clear();
         instructionBlockInstalledCache.clear();
@@ -160,8 +149,12 @@ public class SeanrsApp {
         tableSentCache.clear();
         tableInstalledCache.clear();
 
-        componentConfigService.registerProperties(getClass());
+//        componentConfigService.registerProperties(getClass());
         modified(context);
+
+        executor = Executors.newSingleThreadExecutor(groupedThreads("onos/seanet/sea_nrs", "main", log));
+        flowRuleService.addListener(flowRuleListener);
+
         //Send flow tables to the switches that have been connected
         for (Device device : deviceService.getAvailableDevices()) {
             if (device.id().toString().startsWith("pof")) {
@@ -217,7 +210,7 @@ public class SeanrsApp {
     // =================== Flow Tables =======================
 
     private void buildNRSTables(DeviceId deviceId) {
-        log.debug("========== build NRS Table begin for device {} ==========", deviceId);
+        log.info("========== build NRS Table begin for device {} ==========", deviceId);
         {
             FlowRule table1 = createNRSTable(deviceId, SEANRS_TABLEID_IPV6, 0);//ipv6
             flowRuleService.applyFlowRules(table1);
@@ -233,11 +226,10 @@ public class SeanrsApp {
             flowRuleService.applyFlowRules(table21);
             tableSentCache.add(table21);
         }
-        log.debug("{} : NRS buildTable end", deviceId);
     }
 
     private FlowRule createNRSTable(DeviceId deviceId, int tableId, int offset) {
-        log.info("---------- createNRSTable{}, in {} begin ----------", tableId, deviceId);
+        log.debug("---------- createNRSTable{}, in {} begin ----------", tableId, deviceId);
 
         OFMatch20Selector selector = new OFMatch20Selector();
         selector.addOFMatch20(FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 24 * 8, 16 * 8); // DEST_IPV6_ADDR
@@ -294,11 +286,35 @@ public class SeanrsApp {
             return false;
         }
         tableInstalled = tableSentCache.contrains(tableInstalledCache, deviceId);
-        if (tableInstalled) log.info("------- NRS tables installed -------");
+        if (tableInstalled) log.debug("------- NRS tables installed -------");
         return tableInstalled;
     }
 
     // ================= Instruction Block =================
+
+    private void addDefaultInstructionBlock(DeviceId deviceId) {
+        log.info("========== add default instruction block for {} ==========", deviceId);
+        {
+            FlowRule blockFlowRule = buildPacketInInstructionBlock(deviceId);
+            flowRuleService.applyFlowRules(blockFlowRule);
+            instructionBlockSentCache.add(blockFlowRule);
+        }
+        {
+            FlowRule blockFlowRule = buildGotoTableInstructionBlock(deviceId, MobilityTableID_for_Ipv6);
+            flowRuleService.applyFlowRules(blockFlowRule);
+            instructionBlockSentCache.add(blockFlowRule);
+        }
+        {
+            FlowRule blockFlowRule = buildGotoTableInstructionBlock(deviceId, MobilityTableID_for_Vlan);
+            flowRuleService.applyFlowRules(blockFlowRule);
+            instructionBlockSentCache.add(blockFlowRule);
+        }
+        {
+            FlowRule blockFlowRule = buildGotoTableInstructionBlock(deviceId, MobilityTableID_for_Qinq);
+            flowRuleService.applyFlowRules(blockFlowRule);
+            instructionBlockSentCache.add(blockFlowRule);
+        }
+    }
 
     private FlowRule buildPacketInInstructionBlock(DeviceId deviceId) {
         log.debug("---------- build packetIn instruction block for {} ----------", deviceId);
@@ -366,41 +382,31 @@ public class SeanrsApp {
         return blockFlowRule;
     }
 
-    private void addDefaultInstructionBlock(DeviceId deviceId) {
-        log.debug("========== add default instruction block for {} ==========", deviceId);
-        {
-            FlowRule blockFlowRule = buildPacketInInstructionBlock(deviceId);
-            flowRuleService.applyFlowRules(blockFlowRule);
-            instructionBlockSentCache.add(blockFlowRule);
-        }
-        {
-            FlowRule blockFlowRule = buildGotoTableInstructionBlock(deviceId, MobilityTableID_for_Ipv6);
-            flowRuleService.applyFlowRules(blockFlowRule);
-            instructionBlockSentCache.add(blockFlowRule);
-        }
-        {
-            FlowRule blockFlowRule = buildGotoTableInstructionBlock(deviceId, MobilityTableID_for_Vlan);
-            flowRuleService.applyFlowRules(blockFlowRule);
-            instructionBlockSentCache.add(blockFlowRule);
-        }
-        {
-            FlowRule blockFlowRule = buildGotoTableInstructionBlock(deviceId, MobilityTableID_for_Qinq);
-            flowRuleService.applyFlowRules(blockFlowRule);
-            instructionBlockSentCache.add(blockFlowRule);
-        }
-    }
-
     private boolean allInstructionBlocksInstalled(DeviceId deviceId) {
         boolean instructionBlockInstalled;
         if (instructionBlockSentCache.size(deviceId) == 0) {
             return false;
         }
         instructionBlockInstalled = instructionBlockSentCache.contrains(instructionBlockInstalledCache, deviceId);
-        if (instructionBlockInstalled) log.info("------- NRS instruction blocks installed -------");
+        if (instructionBlockInstalled) log.debug("------- NRS instruction blocks installed -------");
         return instructionBlockInstalled;
     }
 
     // =================== Flow Entries ======================
+
+    private void addDefaultFlowEntry(DeviceId deviceId) {
+        log.info("========== add default flow entry for device:{} ==========", deviceId);
+        try {
+            addPacketInFlowEntry(deviceId, SEANRS_TABLEID_IPV6);
+            addPacketInFlowEntry(deviceId, SEANRS_TABLEID_Vlan);
+            addPacketInFlowEntry(deviceId, SEANRS_TABLEID_Qinq);
+            addDefaultGoToTableFlowEntry(deviceId, SEANRS_TABLEID_IPV6, MobilityTableID_for_Ipv6);
+            addDefaultGoToTableFlowEntry(deviceId, SEANRS_TABLEID_Vlan, MobilityTableID_for_Vlan);
+            addDefaultGoToTableFlowEntry(deviceId, SEANRS_TABLEID_Qinq, MobilityTableID_for_Qinq);
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+        }
+    }
 
     private void addPacketInFlowEntry(DeviceId deviceId, int tableId) {
         log.debug("---------- add PacketIn flow entry for table{}, device:{} ----------", tableId, deviceId);
@@ -531,21 +537,6 @@ public class SeanrsApp {
         flowEntrySentCache.add(flowRule);
         flowRuleService.applyFlowRules(flowRule);
     }
-
-    private void addDefaultFlowEntry(DeviceId deviceId) {
-        log.debug("========== add default flow entry for device:{} ==========", deviceId);
-        try {
-            addPacketInFlowEntry(deviceId, SEANRS_TABLEID_IPV6);
-            addPacketInFlowEntry(deviceId, SEANRS_TABLEID_Vlan);
-            addPacketInFlowEntry(deviceId, SEANRS_TABLEID_Qinq);
-            addDefaultGoToTableFlowEntry(deviceId, SEANRS_TABLEID_IPV6, MobilityTableID_for_Ipv6);
-            addDefaultGoToTableFlowEntry(deviceId, SEANRS_TABLEID_Vlan, MobilityTableID_for_Vlan);
-            addDefaultGoToTableFlowEntry(deviceId, SEANRS_TABLEID_Qinq, MobilityTableID_for_Qinq);
-        } catch (Exception e) {
-            log.error(e.getMessage(), e);
-        }
-    }
-
 
     // ====================== process =========================
     /**
