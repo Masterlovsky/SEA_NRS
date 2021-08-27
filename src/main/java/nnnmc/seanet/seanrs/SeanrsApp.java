@@ -50,14 +50,14 @@ import static org.onlab.util.Tools.groupedThreads;
         property = {
                 NRS_TABLE_BASE_ID + ":Integer=" + NRS_TABLE_BASE_ID_DEFAULT,
                 MOBILITY_TABLE_BASE_ID + ":Integer=" + MOBILITY_TABLE_BASE_ID_DEFAULT,
-                tableSize + ":Integer=" + SIZE_DEFAULT,
-                irs_na + ":String=" + IRS_NA_DEFAULT,
-                irs_port + ":Integer=" + IRS_PORT_DEFAULT,
-                bgp_num + ":Integer=" + BGP_NUM_DEFAULT,
-                bgp_na + ":String=" + BGP_NA
+                TABLESIZE + ":Integer=" + SIZE_DEFAULT,
+                IRS_NA_NAME + ":String=" + IRS_NA_DEFAULT,
+                IRS_PORT_NAME + ":Integer=" + IRS_PORT_DEFAULT,
+                BGP_NUM_NAME + ":Integer=" + BGP_NUM_DEFAULT,
+                BGP_NA_NAME + ":String=" + BGP_NA
         }
 )
-public class Seanrs {
+public class SeanrsApp {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -119,11 +119,11 @@ public class Seanrs {
 
     private void readComponentConfiguration(ComponentContext context) {
         Dictionary<?, ?> properties = context.getProperties();
-        IRS_NA = Tools.get(properties, irs_na);
-        BGP_NUM = Tools.getIntegerProperty(properties, bgp_num, BGP_NUM_DEFAULT);
-        IRS_port = Tools.getIntegerProperty(properties, irs_port, IRS_PORT_DEFAULT);
-        DEFAULT_TABLE_SIZE = Tools.getIntegerProperty(properties, tableSize, SIZE_DEFAULT);
-        BGP_NA_String = Tools.get(properties, bgp_na);
+        IRS_NA = Tools.get(properties, IRS_NA_NAME);
+        BGP_NUM = Tools.getIntegerProperty(properties, BGP_NUM_NAME, BGP_NUM_DEFAULT);
+        IRS_port = Tools.getIntegerProperty(properties, IRS_PORT_NAME, IRS_PORT_DEFAULT);
+        DEFAULT_TABLE_SIZE = Tools.getIntegerProperty(properties, TABLESIZE, SIZE_DEFAULT);
+        BGP_NA_String = Tools.get(properties, BGP_NA_NAME);
     }
 
 

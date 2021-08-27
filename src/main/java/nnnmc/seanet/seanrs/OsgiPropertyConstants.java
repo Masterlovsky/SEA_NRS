@@ -28,18 +28,18 @@ public final class OsgiPropertyConstants {
     public static final String MOBILITY_TABLE_BASE_ID = "mobilityTableBaseId";
     public static final int MOBILITY_TABLE_BASE_ID_DEFAULT = 2;
 
-    public static final String tableSize = "tableSize";
+    public static final String TABLESIZE = "tableSize";
     public static final int SIZE_DEFAULT = 1024 * 64;
 
-    public static final String irs_na = "irs_na";
+    public static final String IRS_NA_NAME = "IRS_NA_NAME";
     public static final String IRS_NA_DEFAULT = "2400:dd01:1037:201:192:168:47:191";
 
-    public static final String irs_port = "irs_port";
+    public static final String IRS_PORT_NAME = "IRS_PORT_NAME";
     public static final int IRS_PORT_DEFAULT = 10061;
 
-    public static final String bgp_num = "bgp_num";
+    public static final String BGP_NUM_NAME = "BGP_NUM_NAME";
     public static final int BGP_NUM_DEFAULT = 1;
 
-    public static final String bgp_na = "bgp_na";
+    public static final String BGP_NA_NAME = "BGP_NA_NAME";
     public static final String BGP_NA = "2400:dd01:1037:201:192:168:47:198,2400:dd01:1037:201:192:168:47:191";
 }
