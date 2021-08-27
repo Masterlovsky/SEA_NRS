@@ -50,11 +50,11 @@ import static org.onlab.util.Tools.groupedThreads;
         property = {
                 NRS_TABLE_BASE_ID + ":Integer=" + NRS_TABLE_BASE_ID_DEFAULT,
                 MOBILITY_TABLE_BASE_ID + ":Integer=" + MOBILITY_TABLE_BASE_ID_DEFAULT,
-                "tableSize" + ":Integer=" + SIZE_DEFAULT,
-                "irs_na" + ":String=" + IRS_NA_DEFAULT,
-                "irs_port" + ":Integer=" + IRS_PORT_DEFAULT,
-                "bgp_num" + ":Integer=" + BGP_NUM_DEFAULT,
-                "bgp_na" + ":String=" + BGP_NA
+                tableSize + ":Integer=" + SIZE_DEFAULT,
+                irs_na + ":String=" + IRS_NA_DEFAULT,
+                irs_port + ":Integer=" + IRS_PORT_DEFAULT,
+                bgp_num + ":Integer=" + BGP_NUM_DEFAULT,
+                bgp_na + ":String=" + BGP_NA
         }
 )
 public class SeanrsApp {
