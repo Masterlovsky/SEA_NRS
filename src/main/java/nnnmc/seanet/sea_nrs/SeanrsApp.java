@@ -119,11 +119,11 @@ public class SeanrsApp {
 
     private void readComponentConfiguration(ComponentContext context) {
         Dictionary<?, ?> properties = context.getProperties();
-        IRS_NA = Tools.get(properties, "irs_na");
-        BGP_NUM = Tools.getIntegerProperty(properties, "bgp_num", BGP_NUM_DEFAULT);
-        IRS_port = Tools.getIntegerProperty(properties, "irs_port", IRS_PORT_DEFAULT);
-        DEFAULT_TABLE_SIZE = Tools.getIntegerProperty(properties, "tableSize", SIZE_DEFAULT);
-        BGP_NA_String = Tools.get(properties, "bgp_na");
+        IRS_NA = Tools.get(properties, irs_na);
+        BGP_NUM = Tools.getIntegerProperty(properties, bgp_num, BGP_NUM_DEFAULT);
+        IRS_port = Tools.getIntegerProperty(properties, irs_port, IRS_PORT_DEFAULT);
+        DEFAULT_TABLE_SIZE = Tools.getIntegerProperty(properties, tableSize, SIZE_DEFAULT);
+        BGP_NA_String = Tools.get(properties, bgp_na);
     }
 
 
@@ -149,7 +149,7 @@ public class SeanrsApp {
         tableSentCache.clear();
         tableInstalledCache.clear();
 
-//        componentConfigService.registerProperties(getClass());
+        componentConfigService.registerProperties(getClass());
         modified(context);
 
         executor = Executors.newSingleThreadExecutor(groupedThreads("onos/seanet/sea_nrs", "main", log));
