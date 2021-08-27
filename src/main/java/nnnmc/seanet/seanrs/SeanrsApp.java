@@ -55,8 +55,7 @@ import static org.onlab.util.Tools.groupedThreads;
                 IRS_PORT_NAME + ":Integer=" + IRS_PORT_DEFAULT,
                 BGP_NUM_NAME + ":Integer=" + BGP_NUM_DEFAULT,
                 BGP_NA_NAME + ":String=" + BGP_NA
-        }
-)
+        })
 public class SeanrsApp {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
@@ -137,9 +136,7 @@ public class SeanrsApp {
 
     @Activate
     public void activate(ComponentContext context) {
-//        for test: ---------------------
-        bgp_Na_List.addAll(Arrays.asList(BGP_NA_String.split(",")));
-//        -------------------------
+
         appId = coreService.registerApplication("org.onosproject.sea_nrs");
         local = clusterService.getLocalNode().id();
 
@@ -155,6 +152,7 @@ public class SeanrsApp {
         executor = Executors.newSingleThreadExecutor(groupedThreads("onos/seanet/sea_nrs", "main", log));
         flowRuleService.addListener(flowRuleListener);
 
+        bgp_Na_List.addAll(Arrays.asList(BGP_NA_String.split(",")));
         //Send flow tables to the switches that have been connected
         for (Device device : deviceService.getAvailableDevices()) {
             if (device.id().toString().startsWith("pof")) {
