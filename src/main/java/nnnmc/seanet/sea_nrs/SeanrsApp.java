@@ -139,6 +139,14 @@ public class SeanrsApp {
     public void activate(ComponentContext context) {
 //        for test: ---------------------
         bgp_Na_List.addAll(Arrays.asList(BGP_NA_String.split(",")));
+        byte[] bytes = null;
+        try {
+            bytes = SendAndRecv.throughUDP("2400:dd01:1037:201:192:168:47:191", 10061,
+                    SocketUtil.hexStringToBytes("7100000663653962bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb5f5896b3010101020102"));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        log.info("try to send to 2400:dd01:1037:201:192:168:47:191 udp eid resolve msg, receive is: {}", SocketUtil.bytesToHexString(bytes));
 //        -------------------------
         appId = coreService.registerApplication("org.onosproject.sea_nrs");
         local = clusterService.getLocalNode().id();
