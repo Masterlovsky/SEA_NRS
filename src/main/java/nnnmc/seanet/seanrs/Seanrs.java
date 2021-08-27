@@ -57,7 +57,7 @@ import static org.onlab.util.Tools.groupedThreads;
                 bgp_na + ":String=" + BGP_NA
         }
 )
-public class SeanrsApp {
+public class Seanrs {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
