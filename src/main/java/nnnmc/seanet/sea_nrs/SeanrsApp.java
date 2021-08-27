@@ -141,7 +141,7 @@ public class SeanrsApp {
         bgp_Na_List.addAll(Arrays.asList(BGP_NA_String.split(",")));
         byte[] bytes = null;
         try {
-            bytes = SendAndRecv.throughUDP("2400:dd01:1037:201:192:168:47:191", 10061,
+            bytes = SendAndRecv.throughUDP(HexUtil.ip2HexString("2400:dd01:1037:201:192:168:47:191", 32), 10061,
                     SocketUtil.hexStringToBytes("7100000663653962bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb5f5896b3010101020102"));
         } catch (Exception e) {
             e.printStackTrace();
