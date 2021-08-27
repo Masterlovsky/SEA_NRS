@@ -1,4 +1,4 @@
-package nnnmc.seanet.sea_nrs.util;
+package nnnmc.seanet.seanrs.util;
 
 public interface Message {
     int TYPE_LEN = 1;

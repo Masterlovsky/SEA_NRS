@@ -1,4 +1,4 @@
-package nnnmc.seanet.sea_nrs.protocol;
+package nnnmc.seanet.seanrs.protocol;
 
 import com.google.common.collect.ImmutableMap;
 import org.onlab.packet.*;

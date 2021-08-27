@@ -27,11 +27,11 @@
 
 
 	<groupId>org.onosproject</groupId>
-    <artifactId>onos-apps-seanet-nrs</artifactId>
+    <artifactId>onos-apps-seanet-seanrs</artifactId>
     <description>SEANET Name Resolution Service App</description>
 
     <properties>
-        <onos.app.name>org.onosproject.sea_nrs</onos.app.name>
+        <onos.app.name>org.onosproject.seanrs</onos.app.name>
         <onos.app.title>SEANET Name Resolution Service App</onos.app.title>
         <onos.app.category>Test App</onos.app.category>
         <onos.app.url>http://onosproject.org</onos.app.url>

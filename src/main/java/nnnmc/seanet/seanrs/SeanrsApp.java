@@ -1,12 +1,12 @@
-package nnnmc.seanet.sea_nrs;
+package nnnmc.seanet.seanrs;
 
 import nnnmc.seanet.controller.api.FlowRuleCache;
-import nnnmc.seanet.sea_nrs.protocol.IDP;
-import nnnmc.seanet.sea_nrs.protocol.NRS;
-import nnnmc.seanet.sea_nrs.util.HexUtil;
-import nnnmc.seanet.sea_nrs.util.SendAndRecv;
-import nnnmc.seanet.sea_nrs.util.SocketUtil;
-import nnnmc.seanet.sea_nrs.util.Util;
+import nnnmc.seanet.seanrs.protocol.IDP;
+import nnnmc.seanet.seanrs.protocol.NRS;
+import nnnmc.seanet.seanrs.util.HexUtil;
+import nnnmc.seanet.seanrs.util.SendAndRecv;
+import nnnmc.seanet.seanrs.util.SocketUtil;
+import nnnmc.seanet.seanrs.util.Util;
 import org.onlab.packet.Data;
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.IPv6;
@@ -42,7 +42,7 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static nnnmc.seanet.sea_nrs.OsgiPropertyConstants.*;
+import static nnnmc.seanet.seanrs.OsgiPropertyConstants.*;
 import static org.onlab.util.Tools.groupedThreads;
 
 

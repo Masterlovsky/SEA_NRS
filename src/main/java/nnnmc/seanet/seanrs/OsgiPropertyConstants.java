@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package nnnmc.seanet.sea_nrs;
+package nnnmc.seanet.seanrs;
 
 public final class OsgiPropertyConstants {
 

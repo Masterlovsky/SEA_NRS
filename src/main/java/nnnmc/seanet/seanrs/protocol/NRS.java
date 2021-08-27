@@ -1,4 +1,4 @@
-package nnnmc.seanet.sea_nrs.protocol;
+package nnnmc.seanet.seanrs.protocol;
 
 import org.onlab.packet.*;
 

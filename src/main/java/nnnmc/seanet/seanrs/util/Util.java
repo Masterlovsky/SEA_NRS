@@ -1,4 +1,4 @@
-package nnnmc.seanet.sea_nrs.util;
+package nnnmc.seanet.seanrs.util;
 
 import java.util.UUID;
 

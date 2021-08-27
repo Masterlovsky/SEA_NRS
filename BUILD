@@ -14,7 +14,7 @@ osgi_jar (
 
 BUNDLES = [
     '//apps/seanet/api:onos-apps-seanet-api',
-	'//apps/seanet/sea_nrs:onos-apps-seanet-sea_nrs',
+	'//apps/seanet/sea_nrs:onos-apps-seanet-seanrs',
 ]
 
 onos_app (

@@ -1,4 +1,4 @@
-package nnnmc.seanet.sea_nrs.util;
+package nnnmc.seanet.seanrs.util;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,7 +14,7 @@ public class HexUtil {
     }
 
     public static String duplicates(char c, int num) {
-        StringBuilder stringBuilder = new StringBuilder("");
+        StringBuilder stringBuilder = new StringBuilder();
         for (int i = 0; i < num; i++) {
             stringBuilder.append(c);
         }
@@ -48,8 +48,8 @@ public class HexUtil {
             return zeros(totalLen);
         }
         StringBuilder hexIp = new StringBuilder();
-        for (int i = 0; i < ipStrings.length; i++) {
-            int intIp = Integer.parseInt(ipStrings[i]);
+        for (String ipString : ipStrings) {
+            int intIp = Integer.parseInt(ipString);
             if (intIp > 255) {
                 return zeros(totalLen);
             }
@@ -111,7 +111,7 @@ public class HexUtil {
     public static String hexString2ipv6(String hexString) {
         StringBuilder stringBuilder = new StringBuilder();
         for (int i = 0; i < 8; i++) {
-            stringBuilder.append(hexString.substring(4 * i, 4 * i + 4));
+            stringBuilder.append(hexString, 4 * i, 4 * i + 4);
             if (i < 7) {
                 stringBuilder.append(":");
             }

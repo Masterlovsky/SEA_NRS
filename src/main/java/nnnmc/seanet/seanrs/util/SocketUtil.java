@@ -1,4 +1,4 @@
-package nnnmc.seanet.sea_nrs.util;
+package nnnmc.seanet.seanrs.util;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,7 +13,7 @@ public class SocketUtil {
     private static Logger logger = LoggerFactory.getLogger(SocketUtil.class);
 
     public static String bytesToHexString(byte[] src) {
-        StringBuilder stringBuilder = new StringBuilder("");
+        StringBuilder stringBuilder = new StringBuilder();
         if (src == null || src.length <= 0) {
             return null;
         }
@@ -29,7 +29,7 @@ public class SocketUtil {
     }
 
     public static String bytesToHexString(byte[] src, int begin, int count) {
-        StringBuilder stringBuilder = new StringBuilder("");
+        StringBuilder stringBuilder = new StringBuilder();
         if (begin > src.length || (begin + count) > src.length) {
             logger.error("wrong convert range");
             logger.info(begin + " " + count);
@@ -83,14 +83,14 @@ public class SocketUtil {
 
     public static void printHexString(String hint, byte[] b) {
         System.out.print(hint);
-        for (int i = 0; i < b.length; i++) {
-            String hex = Integer.toHexString(b[i] & 0xFF);
+        for (byte value : b) {
+            String hex = Integer.toHexString(value & 0xFF);
             if (hex.length() == 1) {
                 hex = '0' + hex;
             }
             System.out.print(hex.toUpperCase() + " ");
         }
-        System.out.println("");
+        System.out.println();
     }
 
     public static String byteToBit(byte b) {
