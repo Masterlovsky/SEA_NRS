@@ -22,24 +22,24 @@ public final class OsgiPropertyConstants {
 
     }
 
-    public static final String NRS_TABLE_BASE_ID = "nrsTableBaseId";
-    public static final int NRS_TABLE_BASE_ID_DEFAULT = 1;
+    static final String NRS_TABLE_BASE_ID = "nrsTableBaseId";
+    static final int NRS_TABLE_BASE_ID_DEFAULT = 1;
 
-    public static final String MOBILITY_TABLE_BASE_ID = "mobilityTableBaseId";
-    public static final int MOBILITY_TABLE_BASE_ID_DEFAULT = 2;
+    static final String MOBILITY_TABLE_BASE_ID = "mobilityTableBaseId";
+    static final int MOBILITY_TABLE_BASE_ID_DEFAULT = 2;
 
-    public static final String TABLESIZE = "tableSize";
-    public static final int SIZE_DEFAULT = 1024 * 64;
+    static final String TABLESIZE = "tableSize";
+    static final int SIZE_DEFAULT = 1024 * 64;
 
-    public static final String IRS_NA_NAME = "irsNa";
-    public static final String IRS_NA_DEFAULT = "2400:dd01:1037:201:192:168:47:191";
+    static final String IRS_NA_NAME = "irsNa";
+    static final String IRS_NA_DEFAULT = "2400:dd01:1037:201:192:168:47:191";
 
-    public static final String IRS_PORT_NAME = "irsPort";
-    public static final int IRS_PORT_DEFAULT = 10061;
+    static final String IRS_PORT_NAME = "irsPort";
+    static final int IRS_PORT_DEFAULT = 10061;
 
-    public static final String BGP_NUM_NAME = "bgpNum";
-    public static final int BGP_NUM_DEFAULT = 1;
+    static final String BGP_NUM_NAME = "bgpNum";
+    static final int BGP_NUM_DEFAULT = 1;
 
-    public static final String BGP_NA_NAME = "bgpNa";
-    public static final String BGP_NA = "2400:dd01:1037:201:192:168:47:198,2400:dd01:1037:201:192:168:47:191";
+    static final String BGP_NA_NAME = "bgpNa";
+    static final String BGP_NA = "2400:dd01:1037:201:192:168:47:198,2400:dd01:1037:201:192:168:47:191";
 }

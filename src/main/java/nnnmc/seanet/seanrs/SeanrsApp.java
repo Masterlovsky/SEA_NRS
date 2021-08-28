@@ -47,7 +47,20 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static nnnmc.seanet.seanrs.OsgiPropertyConstants.*;
+import static nnnmc.seanet.seanrs.OsgiPropertyConstants.NRS_TABLE_BASE_ID;
+import static nnnmc.seanet.seanrs.OsgiPropertyConstants.MOBILITY_TABLE_BASE_ID;
+import static nnnmc.seanet.seanrs.OsgiPropertyConstants.TABLESIZE;
+import static nnnmc.seanet.seanrs.OsgiPropertyConstants.IRS_PORT_NAME;
+import static nnnmc.seanet.seanrs.OsgiPropertyConstants.BGP_NUM_NAME;
+import static nnnmc.seanet.seanrs.OsgiPropertyConstants.BGP_NA_NAME;
+import static nnnmc.seanet.seanrs.OsgiPropertyConstants.IRS_NA_NAME;
+import static nnnmc.seanet.seanrs.OsgiPropertyConstants.NRS_TABLE_BASE_ID_DEFAULT;
+import static nnnmc.seanet.seanrs.OsgiPropertyConstants.MOBILITY_TABLE_BASE_ID_DEFAULT;
+import static nnnmc.seanet.seanrs.OsgiPropertyConstants.SIZE_DEFAULT;
+import static nnnmc.seanet.seanrs.OsgiPropertyConstants.IRS_PORT_DEFAULT;
+import static nnnmc.seanet.seanrs.OsgiPropertyConstants.BGP_NUM_DEFAULT;
+import static nnnmc.seanet.seanrs.OsgiPropertyConstants.BGP_NA;
+import static nnnmc.seanet.seanrs.OsgiPropertyConstants.IRS_NA_DEFAULT;
 import static org.onlab.util.Tools.groupedThreads;
 
 
