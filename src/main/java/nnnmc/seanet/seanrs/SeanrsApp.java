@@ -1,5 +1,12 @@
 package nnnmc.seanet.seanrs;
 
+import org.osgi.service.component.ComponentContext;
+import org.osgi.service.component.annotations.Activate;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Deactivate;
+import org.osgi.service.component.annotations.Modified;
+import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.component.annotations.ReferenceCardinality;
 import nnnmc.seanet.controller.api.FlowRuleCache;
 import nnnmc.seanet.seanrs.protocol.IDP;
 import nnnmc.seanet.seanrs.protocol.NRS;
@@ -30,13 +37,6 @@ import org.onosproject.net.intf.Interface;
 import org.onosproject.net.intf.InterfaceService;
 import org.onosproject.net.packet.*;
 import org.onosproject.pof.*;
-import org.osgi.service.component.ComponentContext;
-import org.osgi.service.component.annotations.Component;
-import org.osgi.service.component.annotations.Activate;
-import org.osgi.service.component.annotations.Deactivate;
-import org.osgi.service.component.annotations.Modified;
-import org.osgi.service.component.annotations.Reference;
-import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,7 +64,7 @@ import static org.onlab.util.Tools.groupedThreads;
         }
 )
 
-public class Seanrs {
+public class SeanrsApp {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
