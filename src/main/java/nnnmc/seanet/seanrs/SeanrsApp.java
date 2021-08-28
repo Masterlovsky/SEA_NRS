@@ -149,11 +149,11 @@ public class SeanrsApp {
         tableSentCache.clear();
         tableInstalledCache.clear();
 
-        componentConfigService.registerProperties(getClass());
-        modified(context);
-
         executor = Executors.newSingleThreadExecutor(groupedThreads("onos/seanet/sea_nrs", "main", log));
         flowRuleService.addListener(flowRuleListener);
+
+        componentConfigService.registerProperties(getClass());
+        modified(context);
 
         bgp_Na_List.addAll(Arrays.asList(BGP_NA_String.split(",")));
         //Send flow tables to the switches that have been connected

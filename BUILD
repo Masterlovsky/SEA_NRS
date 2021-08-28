@@ -1,6 +1,10 @@
-COMPILE_DEPS = CORE_DEPS + JACKSON + [
-    "@jackson_core_asl//jar",
+COMPILE_DEPS = CORE_DEPS + JACKSON + CLI + [
+    "@joda_time//jar",
+	"@jackson_core_asl//jar",
     "@jackson_mapper_asl//jar",
+    "@org_apache_karaf_shell_console//jar",
+    "@concurrent_trees//jar",
+    "@servlet_api//jar",
     "//protocols/pof/pofio:onos-protocols-pof-pofio",
 	'//protocols/pof/api:onos-protocols-pof-api',
 	'//apps/seanet/api:onos-apps-seanet-api',
