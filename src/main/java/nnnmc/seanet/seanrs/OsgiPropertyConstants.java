@@ -31,15 +31,15 @@ public final class OsgiPropertyConstants {
     public static final String TABLESIZE = "tableSize";
     public static final int SIZE_DEFAULT = 1024 * 64;
 
-    public static final String IRS_NA_NAME = "IRS_NA_NAME";
+    public static final String IRS_NA_NAME = "irsNa";
     public static final String IRS_NA_DEFAULT = "2400:dd01:1037:201:192:168:47:191";
 
-    public static final String IRS_PORT_NAME = "IRS_PORT_NAME";
+    public static final String IRS_PORT_NAME = "irsPort";
     public static final int IRS_PORT_DEFAULT = 10061;
 
-    public static final String BGP_NUM_NAME = "BGP_NUM_NAME";
+    public static final String BGP_NUM_NAME = "bgpNum";
     public static final int BGP_NUM_DEFAULT = 1;
 
-    public static final String BGP_NA_NAME = "BGP_NA_NAME";
+    public static final String BGP_NA_NAME = "bgpNa";
     public static final String BGP_NA = "2400:dd01:1037:201:192:168:47:198,2400:dd01:1037:201:192:168:47:191";
 }

@@ -46,7 +46,8 @@ import static nnnmc.seanet.seanrs.OsgiPropertyConstants.*;
 import static org.onlab.util.Tools.groupedThreads;
 
 
-@Component(immediate = true,
+@Component(
+        immediate = true,
         property = {
                 NRS_TABLE_BASE_ID + ":Integer=" + NRS_TABLE_BASE_ID_DEFAULT,
                 MOBILITY_TABLE_BASE_ID + ":Integer=" + MOBILITY_TABLE_BASE_ID_DEFAULT,
@@ -55,7 +56,8 @@ import static org.onlab.util.Tools.groupedThreads;
                 IRS_PORT_NAME + ":Integer=" + IRS_PORT_DEFAULT,
                 BGP_NUM_NAME + ":Integer=" + BGP_NUM_DEFAULT,
                 BGP_NA_NAME + ":String=" + BGP_NA
-        })
+        }
+)
 public class SeanrsApp {
 
     private final Logger log = LoggerFactory.getLogger(getClass());

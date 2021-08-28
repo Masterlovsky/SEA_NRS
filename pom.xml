@@ -25,9 +25,7 @@
         <version>2.3.0</version>
 	</parent>
 
-
-	<groupId>org.onosproject</groupId>
-    <artifactId>onos-apps-seanet-seanrs</artifactId>
+	<artifactId>onos-apps-seanet-seanrs</artifactId>
     <description>SEANET Name Resolution Service App</description>
 
     <properties>
@@ -37,57 +35,5 @@
         <onos.app.url>http://onosproject.org</onos.app.url>
         <onos.app.readme>SEANET Name Resolution Service App</onos.app.readme>
     </properties>
-    
-    
- 	<dependencies>
-		<dependency>
-			<groupId>org.apache.karaf.shell</groupId>
-			<artifactId>org.apache.karaf.shell.core</artifactId>
-			<version>4.2.6</version>
-		</dependency>
-		
-		<dependency>
-			<groupId>org.onosproject</groupId>
-			<artifactId>onos-apps-seanet-api</artifactId>
-			<version>${project.version}</version>
-		</dependency>
-        
-        <dependency>
-			<groupId>org.onosproject</groupId>
-			<artifactId>onos-protocols-pof-api</artifactId>
-			<version>${project.version}</version>
-		</dependency>
-        
-        <dependency>
-			<groupId>org.onosproject</groupId>
-			<artifactId>onos-protocols-pof-pofio</artifactId>
-			<version>${project.version}</version>
-		</dependency>
-		
-		<dependency>
-            <groupId>org.onosproject</groupId>
-            <artifactId>onlab-rest</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-		
-		<dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-			<version>2.10.0</version>
-        </dependency>
-		
-		<dependency>
-            <groupId>javax.ws.rs</groupId>
-            <artifactId>javax.ws.rs-api</artifactId>
-			<version>2.1</version>
-        </dependency>
-        
-        <dependency>
-		  <groupId>javax.servlet</groupId>
-		  <artifactId>servlet-api</artifactId>
-		  <version>2.5</version>
-		</dependency>
-        
-	</dependencies>
 
 </project>
