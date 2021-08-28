@@ -91,12 +91,12 @@ public class SeanrsApp {
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected FlowRuleStore store;
 
-    private static final int SEANRS_TABLEID_IPV6 = NRS_TABLE_BASE_ID_DEFAULT;
-    private static final int SEANRS_TABLEID_Vlan = NRS_TABLE_BASE_ID_DEFAULT + 10;
-    private static final int SEANRS_TABLEID_Qinq = NRS_TABLE_BASE_ID_DEFAULT + 20;
-    private static final int MobilityTableID_for_Ipv6 = MOBILITY_TABLE_BASE_ID_DEFAULT;
-    private static final int MobilityTableID_for_Vlan = MOBILITY_TABLE_BASE_ID_DEFAULT + 10;
-    private static final int MobilityTableID_for_Qinq = MOBILITY_TABLE_BASE_ID_DEFAULT + 20;
+    private static int SEANRS_TABLEID_IPV6 = NRS_TABLE_BASE_ID_DEFAULT;
+    private static int SEANRS_TABLEID_Vlan = NRS_TABLE_BASE_ID_DEFAULT + 10;
+    private static int SEANRS_TABLEID_Qinq = NRS_TABLE_BASE_ID_DEFAULT + 20;
+    private static int MobilityTableID_for_Ipv6 = MOBILITY_TABLE_BASE_ID_DEFAULT;
+    private static int MobilityTableID_for_Vlan = MOBILITY_TABLE_BASE_ID_DEFAULT + 10;
+    private static int MobilityTableID_for_Qinq = MOBILITY_TABLE_BASE_ID_DEFAULT + 20;
     private static final int DEFAULT_PRIORITY = 1000;
     private static final int PKTIN_PRIORITY = 2000;
     private static final int FORWARD_PRIORITY = 5000;
