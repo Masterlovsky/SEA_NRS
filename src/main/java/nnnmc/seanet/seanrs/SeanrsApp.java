@@ -54,8 +54,8 @@ import static org.onlab.util.Tools.groupedThreads;
 @Component(
         immediate = true,
         property = {
-                NRS_TABLE_BASE_ID + ":Integer=" + NRS_TABLE_BASE_ID_DEFAULT,
-                MOBILITY_TABLE_BASE_ID + ":Integer=" + MOBILITY_TABLE_BASE_ID_DEFAULT,
+                SEANRS_TABLEID_IPV6 + ":Integer=" + NRS_TABLE_BASE_ID_DEFAULT,
+                MOBILITY_TABLEID_FOR_IPV6 + ":Integer=" + MOBILITY_TABLE_BASE_ID_DEFAULT,
                 TABLESIZE + ":Integer=" + SIZE_DEFAULT,
                 IRS_PORT_NAME + ":Integer=" + IRS_PORT_DEFAULT,
                 BGP_NUM_NAME + ":Integer=" + BGP_NUM_DEFAULT,
@@ -95,10 +95,10 @@ public class SeanrsApp {
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected FlowRuleStore store;
 
-    protected int SEANRS_TABLEID_IPV6 = NRS_TABLE_BASE_ID_DEFAULT;
-    protected int SEANRS_TABLEID_Vlan = NRS_TABLE_BASE_ID_DEFAULT + 10;
-    protected int SEANRS_TABLEID_Qinq = NRS_TABLE_BASE_ID_DEFAULT + 20;
-    protected int MobilityTableID_for_Ipv6 = MOBILITY_TABLE_BASE_ID_DEFAULT;
+    protected int seanrs_tableid_ipv6 = NRS_TABLE_BASE_ID_DEFAULT;
+    protected int seanrs_tableid_vlan = NRS_TABLE_BASE_ID_DEFAULT + 10;
+    protected int seanrs_tableid_qinq = NRS_TABLE_BASE_ID_DEFAULT + 20;
+    protected int mobility_tableid_for_ipv6 = MOBILITY_TABLE_BASE_ID_DEFAULT;
     protected int MobilityTableID_for_Vlan = MOBILITY_TABLE_BASE_ID_DEFAULT + 10;
     protected int MobilityTableID_for_Qinq = MOBILITY_TABLE_BASE_ID_DEFAULT + 20;
 
@@ -107,12 +107,12 @@ public class SeanrsApp {
     private static final int FORWARD_PRIORITY = 5000;
     private static final int ETH_HEADER_LEN = 14 * 8;
     private static final String NA_ZEROS = HexUtil.zeros(32);
-    private static int DEFAULT_TABLE_SIZE = SIZE_DEFAULT;
-    private static String IRS_NA = IRS_NA_DEFAULT;
-    private static int IRS_port = IRS_PORT_DEFAULT;
+    private static int tableSize = SIZE_DEFAULT;
+    private static String irsNa = IRS_NA_DEFAULT;
+    private static int irsPort = IRS_PORT_DEFAULT;
     private static final List<String> bgp_Na_List = new ArrayList<>();
-    private static int BGP_NUM = BGP_NUM_DEFAULT;
-    private static String BGP_NA_String = BGP_NA;
+    private static int bgpNum = BGP_NUM_DEFAULT;
+    private static String bgpNaStr = BGP_NA;
 
     private final FlowRuleCache instructionBlockSentCache = new FlowRuleCache();
     private final FlowRuleCache instructionBlockInstalledCache = new FlowRuleCache();
@@ -127,17 +127,17 @@ public class SeanrsApp {
 
     private void readComponentConfiguration(ComponentContext context) {
         Dictionary<?, ?> properties = context.getProperties();
-        IRS_NA = Tools.get(properties, IRS_NA_NAME);
-        BGP_NUM = Tools.getIntegerProperty(properties, BGP_NUM_NAME, BGP_NUM_DEFAULT);
-        IRS_port = Tools.getIntegerProperty(properties, IRS_PORT_NAME, IRS_PORT_DEFAULT);
-        DEFAULT_TABLE_SIZE = Tools.getIntegerProperty(properties, TABLESIZE, SIZE_DEFAULT);
-        BGP_NA_String = Tools.get(properties, BGP_NA_NAME);
-        SEANRS_TABLEID_IPV6 = Tools.getIntegerProperty(properties, NRS_TABLE_BASE_ID, NRS_TABLE_BASE_ID_DEFAULT);
-        SEANRS_TABLEID_Vlan = SEANRS_TABLEID_IPV6 + 10;
-        SEANRS_TABLEID_Qinq = SEANRS_TABLEID_IPV6 + 20;
-        MobilityTableID_for_Ipv6 = Tools.getIntegerProperty(properties, MOBILITY_TABLE_BASE_ID, MOBILITY_TABLE_BASE_ID_DEFAULT);
-        MobilityTableID_for_Vlan = MobilityTableID_for_Ipv6 + 10;
-        MobilityTableID_for_Qinq = MobilityTableID_for_Ipv6 + 20;
+        irsNa = Tools.get(properties, IRS_NA_NAME);
+        bgpNum = Tools.getIntegerProperty(properties, BGP_NUM_NAME, BGP_NUM_DEFAULT);
+        irsPort = Tools.getIntegerProperty(properties, IRS_PORT_NAME, IRS_PORT_DEFAULT);
+        tableSize = Tools.getIntegerProperty(properties, TABLESIZE, SIZE_DEFAULT);
+        bgpNaStr = Tools.get(properties, BGP_NA_NAME);
+        seanrs_tableid_ipv6 = Tools.getIntegerProperty(properties, SEANRS_TABLEID_IPV6, NRS_TABLE_BASE_ID_DEFAULT);
+        seanrs_tableid_vlan = seanrs_tableid_ipv6 + 10;
+        seanrs_tableid_qinq = seanrs_tableid_ipv6 + 20;
+        mobility_tableid_for_ipv6 = Tools.getIntegerProperty(properties, MOBILITY_TABLEID_FOR_IPV6, MOBILITY_TABLE_BASE_ID_DEFAULT);
+        MobilityTableID_for_Vlan = mobility_tableid_for_ipv6 + 10;
+        MobilityTableID_for_Qinq = mobility_tableid_for_ipv6 + 20;
     }
 
 
@@ -167,7 +167,7 @@ public class SeanrsApp {
         componentConfigService.registerProperties(getClass());
         modified(context);
 
-        bgp_Na_List.addAll(Arrays.asList(BGP_NA_String.split(",")));
+        bgp_Na_List.addAll(Arrays.asList(bgpNaStr.split(",")));
         //Send flow tables to the switches that have been connected
         for (Device device : deviceService.getAvailableDevices()) {
             if (device.id().toString().startsWith("pof")) {
@@ -225,17 +225,17 @@ public class SeanrsApp {
     private void buildNRSTables(DeviceId deviceId) {
         log.info("========== build NRS Table begin for device {} ==========", deviceId);
         {
-            FlowRule table1 = createNRSTable(deviceId, SEANRS_TABLEID_IPV6, 0);//ipv6
+            FlowRule table1 = createNRSTable(deviceId, seanrs_tableid_ipv6, 0);//ipv6
             flowRuleService.applyFlowRules(table1);
             tableSentCache.add(table1);
         }
         {
-            FlowRule table11 = createNRSTable(deviceId, SEANRS_TABLEID_Vlan, 4);//vlan
+            FlowRule table11 = createNRSTable(deviceId, seanrs_tableid_vlan, 4);//vlan
             flowRuleService.applyFlowRules(table11);
             tableSentCache.add(table11);
         }
         {
-            FlowRule table21 = createNRSTable(deviceId, SEANRS_TABLEID_Qinq, 8);//qinq
+            FlowRule table21 = createNRSTable(deviceId, seanrs_tableid_qinq, 8);//qinq
             flowRuleService.applyFlowRules(table21);
             tableSentCache.add(table21);
         }
@@ -254,7 +254,7 @@ public class SeanrsApp {
         trafficSelectorBuilder.extension(selector, deviceId);
 
         TrafficTreatment.Builder trafficTreatmentBuilder = DefaultTrafficTreatment.builder();
-        trafficTreatmentBuilder.extension(new TableModTreatment(OFTableType.OF_MM_TABLE, DEFAULT_TABLE_SIZE, "NRSTable"), deviceId);
+        trafficTreatmentBuilder.extension(new TableModTreatment(OFTableType.OF_MM_TABLE, tableSize, "NRSTable"), deviceId);
         PofFlowRuleBuilder builder = new PofFlowRuleBuilder();
         FlowRule flowRule = builder
                 .fromApp(appId)
@@ -313,7 +313,7 @@ public class SeanrsApp {
             instructionBlockSentCache.add(blockFlowRule);
         }
         {
-            FlowRule blockFlowRule = buildGotoTableInstructionBlock(deviceId, MobilityTableID_for_Ipv6);
+            FlowRule blockFlowRule = buildGotoTableInstructionBlock(deviceId, mobility_tableid_for_ipv6);
             flowRuleService.applyFlowRules(blockFlowRule);
             instructionBlockSentCache.add(blockFlowRule);
         }
@@ -410,12 +410,12 @@ public class SeanrsApp {
     private void addDefaultFlowEntry(DeviceId deviceId) {
         log.info("========== add default flow entry for device:{} ==========", deviceId);
         try {
-            addPacketInFlowEntry(deviceId, SEANRS_TABLEID_IPV6);
-            addPacketInFlowEntry(deviceId, SEANRS_TABLEID_Vlan);
-            addPacketInFlowEntry(deviceId, SEANRS_TABLEID_Qinq);
-            addDefaultGoToTableFlowEntry(deviceId, SEANRS_TABLEID_IPV6, MobilityTableID_for_Ipv6);
-            addDefaultGoToTableFlowEntry(deviceId, SEANRS_TABLEID_Vlan, MobilityTableID_for_Vlan);
-            addDefaultGoToTableFlowEntry(deviceId, SEANRS_TABLEID_Qinq, MobilityTableID_for_Qinq);
+            addPacketInFlowEntry(deviceId, seanrs_tableid_ipv6);
+            addPacketInFlowEntry(deviceId, seanrs_tableid_vlan);
+            addPacketInFlowEntry(deviceId, seanrs_tableid_qinq);
+            addDefaultGoToTableFlowEntry(deviceId, seanrs_tableid_ipv6, mobility_tableid_for_ipv6);
+            addDefaultGoToTableFlowEntry(deviceId, seanrs_tableid_vlan, MobilityTableID_for_Vlan);
+            addDefaultGoToTableFlowEntry(deviceId, seanrs_tableid_qinq, MobilityTableID_for_Qinq);
         } catch (Exception e) {
             log.error(e.getMessage(), e);
         }
@@ -425,9 +425,9 @@ public class SeanrsApp {
         log.debug("---------- add PacketIn flow entry for table{}, device:{} ----------", tableId, deviceId);
         // packet offset
         int offset = 0;
-        if (tableId == SEANRS_TABLEID_Vlan) {
+        if (tableId == seanrs_tableid_vlan) {
             offset = 4;
-        } else if (tableId == SEANRS_TABLEID_Qinq) {
+        } else if (tableId == seanrs_tableid_qinq) {
             offset = 8;
         }
         // construct selector
@@ -464,9 +464,9 @@ public class SeanrsApp {
         log.debug("---------- add Set IPDstAddr And GoToTable flow entry for table{}, device:{} ----------", tableId, deviceId);
         // packet offset
         int offset = 0;
-        if (tableId == SEANRS_TABLEID_Vlan) {
+        if (tableId == seanrs_tableid_vlan) {
             offset = 4;
-        } else if (tableId == SEANRS_TABLEID_Qinq) {
+        } else if (tableId == seanrs_tableid_qinq) {
             offset = 8;
         }
         // construct selector
@@ -502,9 +502,9 @@ public class SeanrsApp {
         log.debug("---------- add default GoToTable flow entry for table{}, device:{} ----------", tableId, deviceId);
         // packet offset
         int offset = 0;
-        if (tableId == SEANRS_TABLEID_Vlan) {
+        if (tableId == seanrs_tableid_vlan) {
             offset = 4;
-        } else if (tableId == SEANRS_TABLEID_Qinq) {
+        } else if (tableId == seanrs_tableid_qinq) {
             offset = 8;
         }
         // construct selector
@@ -673,17 +673,17 @@ public class SeanrsApp {
                         if (payload != null) {
                             // 转发注册或注销请求给解析单点, 获取响应之后返回
                             String sendToIRSMsg = Util.msgFormat1ToIRSFormat(SocketUtil.bytesToHexString(payload));
-                            byte[] receive = SendAndRecv.throughUDP(IRS_NA, IRS_port, SocketUtil.hexStringToBytes(sendToIRSMsg));
+                            byte[] receive = SendAndRecv.throughUDP(irsNa, irsPort, SocketUtil.hexStringToBytes(sendToIRSMsg));
                             if (receive != null) {
                                 if (Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).startsWith("01", 2)) {
                                     // 注册或注销成功，改payload为格式2，转发给BGP, 控制器不返回注册注销响应报文
-                                    int total_len = 1 + 20 + 16 + 16 + 4 + BGP_NUM * 16;
+                                    int total_len = 1 + 20 + 16 + 16 + 4 + bgpNum * 16;
                                     ByteArrayOutputStream baos = new ByteArrayOutputStream(total_len);
                                     try {
                                         baos.write(Arrays.copyOfRange(payload, 0, 37));
                                         baos.write(SocketUtil.hexStringToBytes(fromSwitchIP_hex));
-                                        baos.write(SocketUtil.int2Bytes(BGP_NUM));
-                                        for (int i = 0; i < BGP_NUM; i++) {
+                                        baos.write(SocketUtil.int2Bytes(bgpNum));
+                                        for (int i = 0; i < bgpNum; i++) {
                                             String BGP_NA = bgp_Na_List.get(i);
                                             baos.write(SocketUtil.hexStringToBytes(HexUtil.ip2HexString(BGP_NA, 32)));
                                         }
@@ -736,7 +736,7 @@ public class SeanrsApp {
                         if (payload != null && nrsPkt.getSource() == 0x01) {
                             // 收到BGP发来的注册/注销失败响应报文，反操作注册注销
                             String sendToIRSMsg = Util.msgFormat2ToIRSFormat(SocketUtil.bytesToHexString(payload));
-                            byte[] receive = SendAndRecv.throughUDP(IRS_NA, IRS_port, SocketUtil.hexStringToBytes(sendToIRSMsg));
+                            byte[] receive = SendAndRecv.throughUDP(irsNa, irsPort, SocketUtil.hexStringToBytes(sendToIRSMsg));
                             if (receive != null && Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).startsWith("01", 2)) {
                                 // 转发给用户注册/注销失败响应报文，响应报文格式1
                                 byte[] payload_format1 = new byte[38];
@@ -757,7 +757,7 @@ public class SeanrsApp {
 //                        byte[] payload = nrsPkt.getPayload().serialize();
                         // 发送给解析单点解析请求 TODO: 暂时未考虑tag解析
                         String resolveMsg = "71" + "000000" + Util.getRandomRequestID() + dstEid + Util.getTimestamp();
-                        byte[] receive = SendAndRecv.throughUDP(IRS_NA, IRS_port, SocketUtil.hexStringToBytes(resolveMsg));
+                        byte[] receive = SendAndRecv.throughUDP(irsNa, irsPort, SocketUtil.hexStringToBytes(resolveMsg));
                         String na = HexUtil.zeros(32);
                         if (receive[1] == 1) {
                             int na_num = SocketUtil.bytes2Int(Arrays.copyOfRange(receive, 12, 14), 0);
@@ -792,7 +792,7 @@ public class SeanrsApp {
                         // TODO: 2021/8/16 是否下发流表项，下发策略？
                         if (dstEid != null) {
                             {
-                                FlowRule blockFlowRule = buildSetAddrAndGotoTableInstructionBlock(deviceId, 0, na, MobilityTableID_for_Ipv6);
+                                FlowRule blockFlowRule = buildSetAddrAndGotoTableInstructionBlock(deviceId, 0, na, mobility_tableid_for_ipv6);
                                 flowRuleService.applyFlowRules(blockFlowRule);
                                 instructionBlockSentCache.add(blockFlowRule);
                             }
@@ -807,13 +807,13 @@ public class SeanrsApp {
                                 instructionBlockSentCache.add(blockFlowRule);
                             }
                             if (allInstructionBlocksInstalled(deviceId)) {
-                                addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, na, SEANRS_TABLEID_IPV6, MobilityTableID_for_Ipv6);
-                                addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, na, SEANRS_TABLEID_Vlan, MobilityTableID_for_Vlan);
-                                addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, na, SEANRS_TABLEID_Qinq, MobilityTableID_for_Qinq);
+                                addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, na, seanrs_tableid_ipv6, mobility_tableid_for_ipv6);
+                                addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, na, seanrs_tableid_vlan, MobilityTableID_for_Vlan);
+                                addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, na, seanrs_tableid_qinq, MobilityTableID_for_Qinq);
                             }
                         }
                     }
-                    FlowModTreatment flowModTreatment = new FlowModTreatment(buildGotoTableInstructionBlock(deviceId, MobilityTableID_for_Ipv6).id().value());
+                    FlowModTreatment flowModTreatment = new FlowModTreatment(buildGotoTableInstructionBlock(deviceId, mobility_tableid_for_ipv6).id().value());
                     TrafficTreatment.Builder builder = DefaultTrafficTreatment.builder();
                     builder.extension(flowModTreatment, deviceId);
                     byte[] outPutBytes = ethPkt.serialize();

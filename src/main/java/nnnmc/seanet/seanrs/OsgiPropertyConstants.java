@@ -22,10 +22,10 @@ public final class OsgiPropertyConstants {
 
     }
 
-    public static final String NRS_TABLE_BASE_ID = "nrsTableBaseId";
+    public static final String SEANRS_TABLEID_IPV6 = "seanrs_tableid_ipv6";
     public static final int NRS_TABLE_BASE_ID_DEFAULT = 1;
 
-    public static final String MOBILITY_TABLE_BASE_ID = "mobilityTableBaseId";
+    public static final String MOBILITY_TABLEID_FOR_IPV6 = "mobility_tableid_for_ipv6";
     public static final int MOBILITY_TABLE_BASE_ID_DEFAULT = 2;
 
     public static final String TABLESIZE = "tableSize";
@@ -40,6 +40,6 @@ public final class OsgiPropertyConstants {
     public static final String BGP_NUM_NAME = "bgpNum";
     public static final int BGP_NUM_DEFAULT = 1;
 
-    public static final String BGP_NA_NAME = "bgpNa";
+    public static final String BGP_NA_NAME = "bgpNaStr";
     public static final String BGP_NA = "2400:dd01:1037:201:192:168:47:198,2400:dd01:1037:201:192:168:47:191";
 }
