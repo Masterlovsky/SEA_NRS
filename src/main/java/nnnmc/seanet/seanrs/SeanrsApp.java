@@ -91,12 +91,12 @@ public class SeanrsApp {
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected FlowRuleStore store;
 
-    private final int SEANRS_TABLEID_IPV6 = NRS_TABLE_BASE_ID_DEFAULT;
-    private final int SEANRS_TABLEID_Vlan = NRS_TABLE_BASE_ID_DEFAULT + 10;
-    private final int SEANRS_TABLEID_Qinq = NRS_TABLE_BASE_ID_DEFAULT + 20;
-    private final int MobilityTableID_for_Ipv6 = MOBILITY_TABLE_BASE_ID_DEFAULT;
-    private final int MobilityTableID_for_Vlan = MOBILITY_TABLE_BASE_ID_DEFAULT + 10;
-    private final int MobilityTableID_for_Qinq = MOBILITY_TABLE_BASE_ID_DEFAULT + 20;
+    private int SEANRS_TABLEID_IPV6 = NRS_TABLE_BASE_ID_DEFAULT;
+    private int SEANRS_TABLEID_Vlan = NRS_TABLE_BASE_ID_DEFAULT + 10;
+    private int SEANRS_TABLEID_Qinq = NRS_TABLE_BASE_ID_DEFAULT + 20;
+    private int MobilityTableID_for_Ipv6 = MOBILITY_TABLE_BASE_ID_DEFAULT;
+    private int MobilityTableID_for_Vlan = MOBILITY_TABLE_BASE_ID_DEFAULT + 10;
+    private int MobilityTableID_for_Qinq = MOBILITY_TABLE_BASE_ID_DEFAULT + 20;
 
     private static final int DEFAULT_PRIORITY = 1000;
     private static final int PKTIN_PRIORITY = 2000;
@@ -415,15 +415,10 @@ public class SeanrsApp {
         log.debug("---------- add PacketIn flow entry for table{}, device:{} ----------", tableId, deviceId);
         // packet offset
         int offset = 0;
-        switch (tableId) {
-            case SEANRS_TABLEID_Vlan:
-                offset = 4;
-                break;
-            case SEANRS_TABLEID_Qinq:
-                offset = 8;
-                break;
-            default:
-                break;
+        if (tableId == SEANRS_TABLEID_Vlan) {
+            offset = 4;
+        } else if (tableId == SEANRS_TABLEID_Qinq) {
+            offset = 8;
         }
         // construct selector
         OFMatchXSelector selector = new OFMatchXSelector();
@@ -459,15 +454,10 @@ public class SeanrsApp {
         log.debug("---------- add Set IPDstAddr And GoToTable flow entry for table{}, device:{} ----------", tableId, deviceId);
         // packet offset
         int offset = 0;
-        switch (tableId) {
-            case SEANRS_TABLEID_Vlan:
-                offset = 4;
-                break;
-            case SEANRS_TABLEID_Qinq:
-                offset = 8;
-                break;
-            default:
-                break;
+        if (tableId == SEANRS_TABLEID_Vlan) {
+            offset = 4;
+        } else if (tableId == SEANRS_TABLEID_Qinq) {
+            offset = 8;
         }
         // construct selector
         OFMatchXSelector selector = new OFMatchXSelector();
@@ -502,15 +492,10 @@ public class SeanrsApp {
         log.debug("---------- add default GoToTable flow entry for table{}, device:{} ----------", tableId, deviceId);
         // packet offset
         int offset = 0;
-        switch (tableId) {
-            case SEANRS_TABLEID_Vlan:
-                offset = 4;
-                break;
-            case SEANRS_TABLEID_Qinq:
-                offset = 8;
-                break;
-            default:
-                break;
+        if (tableId == SEANRS_TABLEID_Vlan) {
+            offset = 4;
+        } else if (tableId == SEANRS_TABLEID_Qinq) {
+            offset = 8;
         }
         // construct selector
         OFMatchXSelector selector = new OFMatchXSelector();
