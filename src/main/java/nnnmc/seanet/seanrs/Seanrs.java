@@ -64,7 +64,7 @@ import static org.onlab.util.Tools.groupedThreads;
         }
 )
 
-public class SeanrsApp {
+public class Seanrs {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
