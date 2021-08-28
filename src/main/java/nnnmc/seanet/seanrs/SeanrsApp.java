@@ -1,7 +1,5 @@
 package nnnmc.seanet.seanrs;
 
-import static nnnmc.seanet.seanrs.OsgiPropertyConstants.*;
-import static org.onlab.util.Tools.groupedThreads;
 import nnnmc.seanet.controller.api.FlowRuleCache;
 import nnnmc.seanet.seanrs.protocol.IDP;
 import nnnmc.seanet.seanrs.protocol.NRS;
@@ -48,6 +46,9 @@ import java.util.*;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import static nnnmc.seanet.seanrs.OsgiPropertyConstants.*;
+import static org.onlab.util.Tools.groupedThreads;
 
 
 @Component(
@@ -131,6 +132,12 @@ public class SeanrsApp {
         IRS_port = Tools.getIntegerProperty(properties, IRS_PORT_NAME, IRS_PORT_DEFAULT);
         DEFAULT_TABLE_SIZE = Tools.getIntegerProperty(properties, TABLESIZE, SIZE_DEFAULT);
         BGP_NA_String = Tools.get(properties, BGP_NA_NAME);
+        SEANRS_TABLEID_IPV6 = Tools.getIntegerProperty(properties, NRS_TABLE_BASE_ID, NRS_TABLE_BASE_ID_DEFAULT);
+        SEANRS_TABLEID_Vlan = SEANRS_TABLEID_IPV6 + 10;
+        SEANRS_TABLEID_Qinq = SEANRS_TABLEID_IPV6 + 20;
+        MobilityTableID_for_Ipv6 = Tools.getIntegerProperty(properties, MOBILITY_TABLE_BASE_ID, MOBILITY_TABLE_BASE_ID_DEFAULT);
+        MobilityTableID_for_Vlan = MobilityTableID_for_Ipv6 + 10;
+        MobilityTableID_for_Qinq = MobilityTableID_for_Ipv6 + 20;
     }
 
 
