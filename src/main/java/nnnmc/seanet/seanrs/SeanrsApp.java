@@ -31,6 +31,7 @@ import org.onosproject.net.intf.InterfaceService;
 import org.onosproject.net.packet.*;
 import org.onosproject.pof.*;
 import org.osgi.service.component.ComponentContext;
+import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
