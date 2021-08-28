@@ -1,5 +1,7 @@
 package nnnmc.seanet.seanrs;
 
+import static nnnmc.seanet.seanrs.OsgiPropertyConstants.*;
+import static org.onlab.util.Tools.groupedThreads;
 import nnnmc.seanet.controller.api.FlowRuleCache;
 import nnnmc.seanet.seanrs.protocol.IDP;
 import nnnmc.seanet.seanrs.protocol.NRS;
@@ -46,9 +48,6 @@ import java.util.*;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
-import static nnnmc.seanet.seanrs.OsgiPropertyConstants.*;
-import static org.onlab.util.Tools.groupedThreads;
 
 
 @Component(
