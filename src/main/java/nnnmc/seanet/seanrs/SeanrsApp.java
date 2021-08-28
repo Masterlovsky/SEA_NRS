@@ -50,13 +50,13 @@ import static org.onlab.util.Tools.groupedThreads;
 @Component(
         immediate = true,
         property = {
-                NRS_TABLE_BASE_ID + ":Integer=" + NRS_TABLE_BASE_ID_DEFAULT,
-                MOBILITY_TABLE_BASE_ID + ":Integer=" + MOBILITY_TABLE_BASE_ID_DEFAULT,
-                TABLESIZE + ":Integer=" + SIZE_DEFAULT,
-                IRS_PORT_NAME + ":Integer=" + IRS_PORT_DEFAULT,
-                BGP_NUM_NAME + ":Integer=" + BGP_NUM_DEFAULT,
-                BGP_NA_NAME + ":String=" + BGP_NA,
-                IRS_NA_NAME + ":String=" + IRS_NA_DEFAULT,
+                "nrsTableBaseId" + ":Integer=" + NRS_TABLE_BASE_ID_DEFAULT,
+                "mobilityTableBaseId" + ":Integer=" + MOBILITY_TABLE_BASE_ID_DEFAULT,
+                "tableSize" + ":Integer=" + SIZE_DEFAULT,
+                "irsPort" + ":Integer=" + IRS_PORT_DEFAULT,
+                "bgpNum" + ":Integer=" + BGP_NUM_DEFAULT,
+                "bgpNa" + ":String=" + BGP_NA,
+                "irsNa" + ":String=" + IRS_NA_DEFAULT,
         }
 )
 
@@ -97,6 +97,7 @@ public class SeanrsApp {
     private final int MobilityTableID_for_Ipv6 = MOBILITY_TABLE_BASE_ID_DEFAULT;
     private final int MobilityTableID_for_Vlan = MOBILITY_TABLE_BASE_ID_DEFAULT + 10;
     private final int MobilityTableID_for_Qinq = MOBILITY_TABLE_BASE_ID_DEFAULT + 20;
+
     private static final int DEFAULT_PRIORITY = 1000;
     private static final int PKTIN_PRIORITY = 2000;
     private static final int FORWARD_PRIORITY = 5000;
