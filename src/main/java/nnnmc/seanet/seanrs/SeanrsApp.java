@@ -52,10 +52,10 @@ import static org.onlab.util.Tools.groupedThreads;
                 NRS_TABLE_BASE_ID + ":Integer=" + NRS_TABLE_BASE_ID_DEFAULT,
                 MOBILITY_TABLE_BASE_ID + ":Integer=" + MOBILITY_TABLE_BASE_ID_DEFAULT,
                 TABLESIZE + ":Integer=" + SIZE_DEFAULT,
-                IRS_NA_NAME + ":String=" + IRS_NA_DEFAULT,
                 IRS_PORT_NAME + ":Integer=" + IRS_PORT_DEFAULT,
                 BGP_NUM_NAME + ":Integer=" + BGP_NUM_DEFAULT,
-                BGP_NA_NAME + ":String=" + BGP_NA
+                BGP_NA_NAME + ":String=" + BGP_NA,
+                IRS_NA_NAME + ":String=" + IRS_NA_DEFAULT,
         }
 )
 
