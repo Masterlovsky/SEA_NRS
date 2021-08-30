@@ -816,9 +816,12 @@ public class SeanrsApp {
                             }
                         }
                     }
-                    FlowModTreatment flowModTreatment = new FlowModTreatment(buildGotoTableInstructionBlock(deviceId, mobility_tableid_for_ipv6).id().value());
+//                    FlowModTreatment flowModTreatment = new FlowModTreatment(buildGotoTableInstructionBlock(deviceId, mobility_tableid_for_ipv6).id().value());
+                    OFInstruction ofInstructionGotoTable = new OFInstructionGotoTable(mobility_tableid_for_ipv6);
+                    InstructionTreatment treatment = new InstructionTreatment();
+                    treatment.addInstruction(ofInstructionGotoTable);
                     TrafficTreatment.Builder builder = DefaultTrafficTreatment.builder();
-                    builder.extension(flowModTreatment, deviceId);
+                    builder.extension(treatment, deviceId);
                     byte[] outPutBytes = ethPkt.serialize();
                     ByteBuffer bf = ByteBuffer.allocate(outPutBytes.length);
                     bf.put(outPutBytes).flip();
