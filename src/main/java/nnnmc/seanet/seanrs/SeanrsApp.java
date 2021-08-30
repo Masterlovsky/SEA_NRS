@@ -762,7 +762,7 @@ public class SeanrsApp {
                         byte[] receive = SendAndRecv.throughUDP(HexUtil.ip2HexString(irsNa, 32), irsPort, SocketUtil.hexStringToBytes(resolveMsg));
                         String na = HexUtil.zeros(32);
                         if (receive[1] == 1) {
-                            int na_num = SocketUtil.bytes2Int(Arrays.copyOfRange(receive, 12, 14), 0);
+                            int na_num = SocketUtil.byteArrayToInt(receive, 12, 2);
                             if (na_num > 0) {
                                 // 解析成功!，将返回的NA的第一个填入ipv6的dstIP字段 TODO：是否有选ip的策略？
                                 na = SocketUtil.bytesToHexString(Arrays.copyOfRange(receive, 34, 50));
