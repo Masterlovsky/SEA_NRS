@@ -759,6 +759,7 @@ public class SeanrsApp {
 //                        byte[] payload = nrsPkt.getPayload().serialize();
                         // 发送给解析单点解析请求 TODO: 暂时未考虑tag解析
                         String resolveMsg = "71" + "000000" + Util.getRandomRequestID() + dstEid + Util.getTimestamp();
+                        log.info("############# irsNa: " + HexUtil.ip2HexString(irsNa, 32));
                         byte[] receive = SendAndRecv.throughUDP(HexUtil.ip2HexString(irsNa, 32), irsPort, SocketUtil.hexStringToBytes(resolveMsg));
                         String na = HexUtil.zeros(32);
                         if (receive[1] == 1) {
