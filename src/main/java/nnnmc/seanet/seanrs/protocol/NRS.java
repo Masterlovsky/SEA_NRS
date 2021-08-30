@@ -1,12 +1,12 @@
 package nnnmc.seanet.seanrs.protocol;
 
-import org.onlab.packet.*;
+import nnnmc.seanet.seanrs.util.Message;
+import nnnmc.seanet.seanrs.util.HexUtil;
+import nnnmc.seanet.seanrs.util.SocketUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.Objects;
-
-import static org.onlab.packet.PacketUtils.checkInput;
+import java.io.ByteArrayOutputStream;
 
 /**
  * |------------------------8------------------------16
@@ -18,23 +18,44 @@ import static org.onlab.packet.PacketUtils.checkInput;
  * |                                                  |
  * |--------------------------------------------------|
  */
-public class NRS extends BasePacket {
+public class NRS implements Message {
+    private final Logger logger = LoggerFactory.getLogger(getClass());
 
     private static final short NRS_HEADER_LENGTH = 20;
     private static final short NA_LENGTH = 16;
-    public static final byte PROTOCOL_NRS = 0x10;
     public static final byte PROTOCOL_SEADP = 0x01;
 
     protected byte nextHeader;
     protected byte queryType;
     protected byte bgpType;
     protected byte source;
+    protected String na;
+    protected byte[] payload;
+    private int totalLength;
+
+    public NRS() {
+        this.nextHeader = PROTOCOL_SEADP;
+        this.queryType = 0x05;
+        this.bgpType = 0;
+        this.source = 0;
+        this.na = HexUtil.zeros(32);
+        this.payload = null;
+        this.totalLength = NRS_HEADER_LENGTH;
+    }
+
+    public NRS(byte[] packet) {
+        this.nextHeader = packet[0];
+        this.queryType = packet[1];
+        this.bgpType = packet[2];
+        this.source = packet[3];
+        this.na = SocketUtil.bytesToHexString(packet, 4, NA_LENGTH);
+        System.arraycopy(packet, NRS_HEADER_LENGTH, this.payload, 0, packet.length - NRS_HEADER_LENGTH);
+        this.totalLength = NRS_HEADER_LENGTH + this.payload.length;
+    }
 
     public void setNextHeader(byte nextHeader) {
         this.nextHeader = nextHeader;
     }
-
-    protected byte[] NA = new byte[16];
 
     public byte getNextHeader() {
         return nextHeader;
@@ -52,96 +73,21 @@ public class NRS extends BasePacket {
         return source;
     }
 
-    public byte[] getNA() {
-        return NA;
+    public String getNa() {
+        return na;
     }
 
-    public void setNA(byte[] NA) {
-        this.NA = NA;
+    public void setNa(String na) {
+        this.na = na;
     }
 
-    /**
-     * Serializes the packet.
-     */
-    @Override
-    public byte[] serialize() {
-        byte[] payloadData = null;
-        if (this.payload != null) {
-            this.payload.setParent(this);
-            payloadData = this.payload.serialize();
-        }
-        int length = 20 + (payloadData == null ? 0 : payloadData.length);
-        final byte[] data = new byte[length];
-        final ByteBuffer bb = ByteBuffer.wrap(data);
-
-        if (this.parent != null && this.parent instanceof IDP) {
-            ((IDP) this.parent).setNextHeader(PROTOCOL_NRS);
-        }
-
-        bb.put(this.getNextHeader());
-        bb.put(this.getQueryType());
-        bb.put(this.getBgpType());
-        bb.put(this.getSource());
-        bb.put(this.getNA());
-        if (payloadData != null) {
-            bb.put(payloadData);
-        }
-        return data;
+    public byte[] getPayload() {
+        return payload;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
-        NRS nrs = (NRS) o;
-        return nextHeader == nrs.nextHeader && queryType == nrs.queryType && bgpType == nrs.bgpType && source == nrs.source && Arrays.equals(NA, nrs.NA);
-    }
-
-    @Override
-    public int hashCode() {
-        int result = Objects.hash(super.hashCode(), nextHeader, queryType, bgpType, source);
-        result = 31 * result + Arrays.hashCode(NA);
-        return result;
-    }
-
-    /**
-     * Deserializer function for NRS packets.
-     *
-     * @return deserializer function
-     */
-    public static Deserializer<NRS> deserializer() {
-        return (data, offset, length) -> {
-            checkInput(data, offset, length, NRS_HEADER_LENGTH);
-
-            NRS nrs = new NRS();
-
-            ByteBuffer bb = ByteBuffer.wrap(data, offset, length);
-            nrs.nextHeader = bb.get();
-            nrs.queryType = bb.get();
-            nrs.bgpType = bb.get();
-            nrs.source = bb.get();
-            bb.get(nrs.NA, 0, NA_LENGTH);
-
-            Deserializer<? extends IPacket> deserializer;
-            deserializer = Data.deserializer();
-
-            nrs.payload = deserializer.deserialize(data, bb.position(),
-                    bb.limit() - bb.position());
-            nrs.payload.setParent(nrs);
-            return nrs;
-        };
-    }
-
-    @Override
-    public String toString() {
-        return "NRS{" +
-                "nextHeader=" + nextHeader +
-                ", queryType=" + queryType +
-                ", bgpType=" + bgpType +
-                ", source=" + source +
-                ", NA=" + Arrays.toString(NA) +
-                '}';
+    public void setPayload(byte[] payload) {
+        this.payload = payload;
+        this.totalLength = NRS_HEADER_LENGTH + payload.length;
     }
 
     public void setQueryType(byte queryType) {
@@ -154,6 +100,47 @@ public class NRS extends BasePacket {
 
     public void setSource(byte source) {
         this.source = source;
+    }
+
+    @Override
+    public byte[] pack() {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try {
+            baos.write(nextHeader);
+            baos.write(queryType);
+            baos.write(bgpType);
+            baos.write(source);
+            baos.write(SocketUtil.hexStringToBytes(na));
+            baos.write(payload);
+        } catch (Exception e) {
+            logger.error(e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+        return baos.toByteArray();
+    }
+
+    @Override
+    public NRS unpack(byte[] data) {
+        try {
+            int point = 0;
+            nextHeader = data[point];
+            point += 1;
+            queryType = data[point];
+            point += 1;
+            bgpType = data[point];
+            point += 1;
+            source = data[point];
+            point += 1;
+            na = SocketUtil.bytesToHexString(data, point, NA_LENGTH);
+            point += NA_LENGTH;
+            System.arraycopy(data, point, payload, 0, data.length - NRS_HEADER_LENGTH);
+        } catch (Exception e) {
+            logger.error(e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+        return this;
     }
 }
 

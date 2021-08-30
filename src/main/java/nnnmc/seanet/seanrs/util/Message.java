@@ -11,7 +11,7 @@ public interface Message {
     int NUM_LEN = 1;
     int REAL_LEN = 1;
     int INT_LEN = 4;
-    int BYTE_LEN = 1;    
+    int BYTE_LEN = 1;
     int TLV_LEN = 2;
     int REMOTE_LEN = 1;
     int LEVEL_LEN = 1;
@@ -43,7 +43,7 @@ public interface Message {
     byte LATENCY_NEIGHBOR_RESP = 81;
     byte INDEX_NEIGHBOR_REQ = 82;
     byte INDEX_NEIGHBOR_RESP = 83;
-    
+
     byte MEASURE_UN = 3;                   // 03
     byte MEASURE_UN_RESP = 4;              // 04
     byte ROOT_QUERY = 5;                   // 05
@@ -138,14 +138,13 @@ public interface Message {
     byte DEL_GEO_NEIGHBOR = 109;           // 6d
 
     // reserve
-    byte REPORT_STATUS = 0;  
-    
-    
+    byte REPORT_STATUS = 0;
+
 
     // device
-    byte DEREGISTER_NA=117;                 //75
-    byte RESOLVE_EID_NA=119;                //77
-    byte RESOLVE_RESP_EID_NA=120;           //78
+    byte DEREGISTER_NA = 117;                 //75
+    byte RESOLVE_EID_NA = 119;                //77
+    byte RESOLVE_RESP_EID_NA = 120;           //78
 
     // global resolution
     byte GLOBAL_REGISTER_TLV = 11;          //7b  123->11
@@ -167,7 +166,7 @@ public interface Message {
     byte OPERT = 69;                        //45
     byte LAL = 70;                          //46
     byte SNMP_RESULT = 71;                  //47
-    
+
 
     byte[] pack();
 

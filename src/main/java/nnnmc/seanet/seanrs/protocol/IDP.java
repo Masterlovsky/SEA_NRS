@@ -1,14 +1,12 @@
 package nnnmc.seanet.seanrs.protocol;
 
-import com.google.common.collect.ImmutableMap;
-import org.onlab.packet.*;
+import nnnmc.seanet.seanrs.util.Message;
+import nnnmc.seanet.seanrs.util.HexUtil;
+import nnnmc.seanet.seanrs.util.SocketUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.Objects;
-
-import static org.onlab.packet.PacketUtils.checkInput;
+import java.io.ByteArrayOutputStream;
 
 /**
  * |------------------------8------------------------16
@@ -24,31 +22,59 @@ import static org.onlab.packet.PacketUtils.checkInput;
  * |                                                  |
  * |--------------------------------------------------|
  */
-public class IDP extends BasePacket {
+public class IDP implements Message {
+    private final Logger logger = LoggerFactory.getLogger(getClass());
 
     private static final short IDP_HEADER_LENGTH = 44;
     private static final short EID_LENGTH = 20;
-    public static final byte PROTOCOL_IDP = (byte) 0x99;
+    private static final short RESERVED_LENGTH = 2;
     public static final byte PROTOCOL_NRS = 0x10;
-    public static final byte PROTOCOL_SEADP = 0x01;
-
-    public static final Map<Byte, Deserializer<? extends IPacket>> PROTOCOL_DESERIALIZER_MAP =
-            ImmutableMap.<Byte, Deserializer<? extends IPacket>>builder()
-                    .put(IDP.PROTOCOL_NRS, NRS.deserializer())
-                    .build();
 
     protected byte nextHeader;
     protected byte sEidType;
     protected byte dEidType;
-    protected short reserved;
-    protected byte[] sourceEID = new byte[EID_LENGTH];
-    protected byte[] destEID = new byte[EID_LENGTH];
+    protected String reserved;
+    protected String sourceEID;
+    protected String destEID;
+    protected byte[] payload;
+    private int totalLen;
+
+    public IDP() {
+        this.nextHeader = PROTOCOL_NRS;
+        this.sEidType = 0;
+        this.dEidType = 0;
+        this.reserved = HexUtil.zeros(32);
+        this.sourceEID = HexUtil.zeros(40);
+        this.destEID = HexUtil.zeros(40);
+        this.payload = null;
+        this.totalLen = IDP_HEADER_LENGTH;
+    }
+
+    public IDP(byte[] packet) {
+        this.nextHeader = packet[0];
+        this.sEidType = (byte) (packet[1] & 0xf0 >> 4);
+        this.dEidType = (byte) (packet[1] & 0x0f);
+        this.reserved = SocketUtil.bytesToHexString(packet, 2, 2);
+        this.sourceEID = SocketUtil.bytesToHexString(packet, 4, EID_LENGTH);
+        this.destEID = SocketUtil.bytesToHexString(packet, 24, EID_LENGTH);
+        System.arraycopy(packet, IDP_HEADER_LENGTH, this.payload, 0, packet.length - IDP_HEADER_LENGTH);
+        this.totalLen = IDP_HEADER_LENGTH + this.payload.length;
+    }
 
     public void setNextHeader(byte nextHeader) {
         this.nextHeader = nextHeader;
     }
 
-    public void setDestEID(byte[] destEID) {
+    public void setPayload(byte[] payload) {
+        this.payload = payload;
+        this.totalLen = IDP_HEADER_LENGTH + payload.length;
+    }
+
+    public byte[] getPayload() {
+        return payload;
+    }
+
+    public void setDestEID(String destEID) {
         this.destEID = destEID;
     }
 
@@ -64,104 +90,54 @@ public class IDP extends BasePacket {
         return dEidType;
     }
 
-    public byte[] getSourceEID() {
+    public String getSourceEID() {
         return sourceEID;
     }
 
-    public byte[] getDestEID() {
+    public String getDestEID() {
         return destEID;
     }
 
-    /**
-     * Serializes the packet.
-     */
     @Override
-    public byte[] serialize() {
-        byte[] payloadData = null;
-        if (this.payload != null) {
-            this.payload.setParent(this);
-            payloadData = this.payload.serialize();
+    public byte[] pack() {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try {
+            baos.write(nextHeader);
+            baos.write((sEidType & 0x0f << 4) | (dEidType & 0x0f));
+            baos.write(SocketUtil.hexStringToBytes(reserved));
+            baos.write(SocketUtil.hexStringToBytes(sourceEID));
+            baos.write(SocketUtil.hexStringToBytes(destEID));
+            baos.write(payload);
+        } catch (Exception e) {
+            logger.error(e.getMessage());
+            e.printStackTrace();
+            return null;
         }
-        int length = 44 + (payloadData == null ? 0 : payloadData.length);
-        final byte[] data = new byte[length];
-        final ByteBuffer bb = ByteBuffer.wrap(data);
+        return baos.toByteArray();
+    }
 
-        if (this.parent != null && this.parent instanceof IPv6) {
-            ((IPv6) this.parent).setNextHeader(PROTOCOL_IDP);
+    @Override
+    public IDP unpack(byte[] data) {
+        try {
+            int point = 0;
+            nextHeader = data[point];
+            point += 1;
+            sEidType = (byte) (data[point] & 0xf0 >> 4);
+            dEidType = (byte) (data[point] & 0x0f);
+            point += 1;
+            reserved = SocketUtil.bytesToHexString(data, point, RESERVED_LENGTH);
+            point += RESERVED_LENGTH;
+            sourceEID = SocketUtil.bytesToHexString(data, point, EID_LENGTH);
+            point += EID_LENGTH;
+            destEID = SocketUtil.bytesToHexString(data, point, EID_LENGTH);
+            point += EID_LENGTH;
+            System.arraycopy(data, point, payload, 0, data.length - IDP_HEADER_LENGTH);
+        } catch (Exception e) {
+            logger.error(e.getMessage());
+            e.printStackTrace();
+            return null;
         }
-
-        bb.put(this.nextHeader);
-        bb.put((byte) ((this.sEidType & 0xf) << 4 | this.dEidType & 0xf));
-        bb.putShort(this.reserved);
-        bb.put(sourceEID);
-        bb.put(destEID);
-        if (payloadData != null) {
-            bb.put(payloadData);
-        }
-        return data;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
-        IDP idp = (IDP) o;
-        return nextHeader == idp.nextHeader && sEidType == idp.sEidType && dEidType == idp.dEidType && reserved == idp.reserved && Arrays.equals(sourceEID, idp.sourceEID) && Arrays.equals(destEID, idp.destEID);
-    }
-
-    @Override
-    public int hashCode() {
-        int result = Objects.hash(super.hashCode(), nextHeader, sEidType, dEidType, reserved);
-        result = 31 * result + Arrays.hashCode(sourceEID);
-        result = 31 * result + Arrays.hashCode(destEID);
-        return result;
-    }
-
-    /**
-     * Deserializer function for IDP packets.
-     * todo 这个地方不知道会不会有问题，应该呗IPv6类调用一下，但是不知道怎么加上
-     * @return deserializer function
-     */
-    public static Deserializer<IDP> deserializer() {
-        return (data, offset, length) -> {
-            checkInput(data, offset, length, IDP_HEADER_LENGTH);
-
-            IDP idp = new IDP();
-
-            ByteBuffer bb = ByteBuffer.wrap(data, offset, length);
-            idp.nextHeader = bb.get();
-            byte temp = bb.get();
-            idp.sEidType = (byte) ((temp >> 4) & 0xf);
-            idp.dEidType = (byte) (temp & 0xf);
-            idp.reserved = bb.getShort();
-            bb.get(idp.sourceEID, 0, EID_LENGTH);
-            bb.get(idp.destEID, 0, EID_LENGTH);
-
-            Deserializer<? extends IPacket> deserializer;
-            if (IDP.PROTOCOL_DESERIALIZER_MAP.containsKey(idp.nextHeader)) {
-                deserializer = IDP.PROTOCOL_DESERIALIZER_MAP.get(idp.nextHeader);
-            } else {
-                deserializer = Data.deserializer();
-            }
-
-            idp.payload = deserializer.deserialize(data, bb.position(),
-                    bb.limit() - bb.position());
-            idp.payload.setParent(idp);
-            return idp;
-        };
-    }
-
-    @Override
-    public String toString() {
-        return "IDP{" +
-                "nextHeader=" + nextHeader +
-                ", sEidType=" + sEidType +
-                ", dEidType=" + dEidType +
-                ", reserved=" + reserved +
-                ", sourceEID=" + Arrays.toString(sourceEID) +
-                ", destEID=" + Arrays.toString(destEID) +
-                '}';
+        return this;
     }
 }
 
