@@ -1,12 +1,5 @@
 package nnnmc.seanet.seanrs;
 
-import org.osgi.service.component.ComponentContext;
-import org.osgi.service.component.annotations.Activate;
-import org.osgi.service.component.annotations.Component;
-import org.osgi.service.component.annotations.Deactivate;
-import org.osgi.service.component.annotations.Modified;
-import org.osgi.service.component.annotations.Reference;
-import org.osgi.service.component.annotations.ReferenceCardinality;
 import nnnmc.seanet.controller.api.FlowRuleCache;
 import nnnmc.seanet.seanrs.protocol.IDP;
 import nnnmc.seanet.seanrs.protocol.NRS;
@@ -37,6 +30,8 @@ import org.onosproject.net.intf.Interface;
 import org.onosproject.net.intf.InterfaceService;
 import org.onosproject.net.packet.*;
 import org.onosproject.pof.*;
+import org.osgi.service.component.ComponentContext;
+import org.osgi.service.component.annotations.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -759,7 +754,7 @@ public class SeanrsApp {
 //                        byte[] payload = nrsPkt.getPayload().serialize();
                         // 发送给解析单点解析请求 TODO: 暂时未考虑tag解析
                         String resolveMsg = "71" + "000000" + Util.getRandomRequestID() + dstEid + Util.getTimestamp();
-                        byte[] receive = SendAndRecv.throughUDP(irsNa, irsPort, SocketUtil.hexStringToBytes(resolveMsg));
+                        byte[] receive = SendAndRecv.throughUDP(HexUtil.ip2HexString(irsNa, 32), irsPort, SocketUtil.hexStringToBytes(resolveMsg));
                         String na = HexUtil.zeros(32);
                         if (receive[1] == 1) {
                             int na_num = SocketUtil.bytes2Int(Arrays.copyOfRange(receive, 12, 14), 0);
