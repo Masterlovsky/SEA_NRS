@@ -461,7 +461,7 @@ public class SeanrsApp {
     }
 
     private void addSetIPDstAddrAndGoToTableFlowEntry(DeviceId deviceId, String eid, String na, int tableId, int gotoTableId) {
-        log.info("---------- add Set IPDstAddr And GoToTable flow entry for table{}, device:{} ----------", tableId, deviceId);
+        log.debug("---------- add Set IPDstAddr And GoToTable flow entry for table{}, device:{} ----------", tableId, deviceId);
         // packet offset
         int offset = 0;
         if (tableId == seanrs_tableid_vlan) {
@@ -785,8 +785,8 @@ public class SeanrsApp {
                         }
                         ipv6Pkt.setDestinationAddress(SocketUtil.hexStringToBytes(na));
                         ethPkt.setPayload(ipv6Pkt);
-                        log.info("############## resolve: " + SocketUtil.bytesToHexString(ethPkt.serialize()));
                         // TODO: 2021/8/16 是否下发流表项，下发策略？
+                        log.info("############ dstEid: " + dstEid);
                         if (dstEid != null) {
                             {
                                 FlowRule blockFlowRule = buildSetAddrAndGotoTableInstructionBlock(deviceId, 0, na, mobility_tableid_for_ipv6);
@@ -803,6 +803,7 @@ public class SeanrsApp {
                                 flowRuleService.applyFlowRules(blockFlowRule);
                                 instructionBlockSentCache.add(blockFlowRule);
                             }
+                            log.info("===========allInstructionBlocksInstalled(deviceId): " + allInstructionBlocksInstalled(deviceId));
                             if (allInstructionBlocksInstalled(deviceId)) {
                                 addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, na, seanrs_tableid_ipv6, mobility_tableid_for_ipv6);
                                 addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, na, seanrs_tableid_vlan, MobilityTableID_for_Vlan);
