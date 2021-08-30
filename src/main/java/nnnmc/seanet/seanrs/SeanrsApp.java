@@ -461,7 +461,7 @@ public class SeanrsApp {
     }
 
     private void addSetIPDstAddrAndGoToTableFlowEntry(DeviceId deviceId, String eid, String na, int tableId, int gotoTableId) {
-        log.debug("---------- add Set IPDstAddr And GoToTable flow entry for table{}, device:{} ----------", tableId, deviceId);
+        log.info("---------- add Set IPDstAddr And GoToTable flow entry for table{}, device:{} ----------", tableId, deviceId);
         // packet offset
         int offset = 0;
         if (tableId == seanrs_tableid_vlan) {
@@ -651,15 +651,6 @@ public class SeanrsApp {
                 log.info("receive UDP packet, content: {}", SocketUtil.bytesToHexString(ipv6Pkt.serialize()));
             } else if (nextHdr == 0x99) {
                 // TODO: 2021/7/27 IDP 暂定使用扩展包头的方式
-                /*
-                byte[] ipv6PktByte = ipv6Pkt.serialize();
-                byte idpNextHeader = ipv6PktByte[40]; // 网内解析匹配字段，0x10
-                byte[] idpReserved = {ipv6PktByte[42], ipv6PktByte[43]}; //
-                byte[] srcEidByte = new byte[20];
-                System.arraycopy(ipv6PktByte, 44, srcEidByte, 0, 20);
-                byte[] dstEidByte = new byte[20];
-                System.arraycopy(ipv6PktByte, 64, dstEidByte, 0, 20);
-                */
                 IDP idpPkt = new IDP().unpack(ipv6Pkt.getPayload().serialize());
                 String nextHeader = HexUtil.byte2HexString(idpPkt.getNextHeader());
                 String dstEid = idpPkt.getDestEID();
@@ -732,6 +723,7 @@ public class SeanrsApp {
                             ethPkt.setPayload(ipv6Pkt);
                         }
                     }
+
                     // TODO: 2021/8/25 register response or deregister response
                     else if (queryType.equals("03") || queryType.equals("04")) {
                         byte[] payload = nrsPkt.getPayload();
@@ -754,6 +746,7 @@ public class SeanrsApp {
                             }
                         }
                     }
+
                     // TODO: 2021/8/22 resolve
                     else if (queryType.equals("05")) {
 //                        byte[] payload = nrsPkt.getPayload().serialize();
@@ -792,6 +785,7 @@ public class SeanrsApp {
                         }
                         ipv6Pkt.setDestinationAddress(SocketUtil.hexStringToBytes(na));
                         ethPkt.setPayload(ipv6Pkt);
+                        log.info("############## resolve: " + SocketUtil.bytesToHexString(ethPkt.serialize()));
                         // TODO: 2021/8/16 是否下发流表项，下发策略？
                         if (dstEid != null) {
                             {
