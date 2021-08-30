@@ -345,7 +345,7 @@ public class SeanrsApp {
     }
 
     private FlowRule buildSetAddrAndGotoTableInstructionBlock(DeviceId deviceId, int offset, String ipAddress, int gotoTableId) {
-        log.info("---------- build SetAddr&GotoTable instruction block for {} ----------", deviceId);
+        log.debug("---------- build SetAddr&GotoTable instruction block for {} ----------", deviceId);
         OFMatch20 ofMatch20 = new OFMatch20(FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 24 * 8, 16 * 8); // IPv6 dstAddr
         InstructionBlockModTreatment instructionBlockModTreatment = new InstructionBlockModTreatment();
         instructionBlockModTreatment.addInstruction(new OFInstructionSetField(ofMatch20, ipAddress));
@@ -590,7 +590,7 @@ public class SeanrsApp {
                                 {
                                     executor.execute(() -> {
                                         if (instructionBlockSentCache.contains(rule)) {
-                                            //log.debug("INSTRUCTION_BLOCK_MOD instructionBlockSentCache.contains\n");
+                                            log.info("INSTRUCTION_BLOCK_MOD instructionBlockSentCache.contains {}\n", rule);
                                             instructionBlockInstalledCache.add(rule);
                                             //需要的默认指令块全部添加完毕，则下发表项; 如果该设备上的表项已经下发完成则不再下发
                                             if (allInstructionBlocksInstalled(deviceId) && !getProcessStatusByDeviceId(deviceId)) {
@@ -790,7 +790,6 @@ public class SeanrsApp {
                             {
                                 FlowRule blockFlowRule = buildSetAddrAndGotoTableInstructionBlock(deviceId, 0, na, mobility_tableid_for_ipv6);
                                 flowRuleService.applyFlowRules(blockFlowRule);
-                                log.info("===================== buildSetAddrAndGotoTableInstructionBlock: ");
                                 instructionBlockSentCache.add(blockFlowRule);
                                 instructionBlockInstalledCache.add(blockFlowRule);
                             }
@@ -806,14 +805,12 @@ public class SeanrsApp {
                                 instructionBlockSentCache.add(blockFlowRule);
                                 instructionBlockInstalledCache.add(blockFlowRule);
                             }
-                            log.info("=========== allInstructionBlocksInstalled(deviceId): " + allInstructionBlocksInstalled(deviceId));
                             String finalNa = na;
                             executor.execute(()->{
-                                if (allInstructionBlocksInstalled(deviceId)) {
-                                    addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, finalNa, seanrs_tableid_ipv6, mobility_tableid_for_ipv6);
-                                    addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, finalNa, seanrs_tableid_vlan, MobilityTableID_for_Vlan);
-                                    addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, finalNa, seanrs_tableid_qinq, MobilityTableID_for_Qinq);
-                                }
+                                log.info("###############finalNA: " + finalNa);
+                                addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, finalNa, seanrs_tableid_ipv6, mobility_tableid_for_ipv6);
+                                addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, finalNa, seanrs_tableid_vlan, MobilityTableID_for_Vlan);
+                                addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, finalNa, seanrs_tableid_qinq, MobilityTableID_for_Qinq);
                             });
 
                         }
