@@ -349,8 +349,7 @@ public class SeanrsApp {
         log.debug("---------- build SetAddr&GotoTable instruction block for {} ----------", deviceId);
         OFMatch20 ofMatch20 = new OFMatch20(FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 24 * 8, 16 * 8); // IPv6 dstAddr
         InstructionBlockModTreatment instructionBlockModTreatment = new InstructionBlockModTreatment();
-        log.warn("############## ipaddr: " + ipAddress);
-        instructionBlockModTreatment.addInstruction(new OFInstructionSetField(ofMatch20, "2400dd01103702010192016800470198"));
+        instructionBlockModTreatment.addInstruction(new OFInstructionSetField(ofMatch20, ipAddress));
         instructionBlockModTreatment.addInstruction(new OFInstructionGotoTable(gotoTableId));
         TrafficTreatment.Builder trafficTreatmentBuilder = DefaultTrafficTreatment.builder().extension(instructionBlockModTreatment, deviceId);
 
@@ -670,7 +669,7 @@ public class SeanrsApp {
                         if (payload != null) {
                             // 转发注册或注销请求给解析单点, 获取响应之后返回
                             String sendToIRSMsg = Util.msgFormat1ToIRSFormat(SocketUtil.bytesToHexString(payload));
-                            byte[] receive = SendAndRecv.throughUDP(irsNa, irsPort, SocketUtil.hexStringToBytes(sendToIRSMsg));
+                            byte[] receive = SendAndRecv.throughUDP(HexUtil.ip2HexString(irsNa, 32), irsPort, SocketUtil.hexStringToBytes(sendToIRSMsg));
                             if (receive != null) {
                                 if (Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).startsWith("01", 2)) {
                                     // 注册或注销成功，改payload为格式2，转发给BGP, 控制器不返回注册注销响应报文
@@ -810,8 +809,8 @@ public class SeanrsApp {
                             executor.execute(() -> {
                                 if (!allInstructionBlocksInstalled(deviceId)) {
                                     try {
-                                        Thread.sleep(3000);
-                                        log.warn("allInstructionBlocksInstalled={}, sleep 3s", allInstructionBlocksInstalled(deviceId));
+                                        Thread.sleep(1000);
+                                        log.warn("allInstructionBlocksInstalled={}, sleep 1s", allInstructionBlocksInstalled(deviceId));
                                     } catch (InterruptedException e) {
                                         e.printStackTrace();
                                     }
