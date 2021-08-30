@@ -347,9 +347,10 @@ public class SeanrsApp {
 
     private FlowRule buildSetAddrAndGotoTableInstructionBlock(DeviceId deviceId, int offset, String ipAddress, int gotoTableId) {
         log.debug("---------- build SetAddr&GotoTable instruction block for {} ----------", deviceId);
-//        OFMatch20 ofMatch20 = new OFMatch20(FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 24 * 8, 16 * 8); // IPv6 dstAddr
+        OFMatch20 ofMatch20 = new OFMatch20(FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 24 * 8, 16 * 8); // IPv6 dstAddr
         InstructionBlockModTreatment instructionBlockModTreatment = new InstructionBlockModTreatment();
-//        instructionBlockModTreatment.addInstruction(new OFInstructionSetField(new OFMatch20(FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 24 * 8, 16 * 8), ipAddress));
+        log.warn("############## ipaddr: " + ipAddress);
+        instructionBlockModTreatment.addInstruction(new OFInstructionSetField(ofMatch20, "2400dd01103702010192016800470198"));
         instructionBlockModTreatment.addInstruction(new OFInstructionGotoTable(gotoTableId));
         TrafficTreatment.Builder trafficTreatmentBuilder = DefaultTrafficTreatment.builder().extension(instructionBlockModTreatment, deviceId);
 
