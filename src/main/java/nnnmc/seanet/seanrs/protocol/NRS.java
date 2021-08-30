@@ -1,7 +1,7 @@
 package nnnmc.seanet.seanrs.protocol;
 
-import nnnmc.seanet.seanrs.util.Message;
 import nnnmc.seanet.seanrs.util.HexUtil;
+import nnnmc.seanet.seanrs.util.Message;
 import nnnmc.seanet.seanrs.util.SocketUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -134,7 +134,10 @@ public class NRS implements Message {
             point += 1;
             na = SocketUtil.bytesToHexString(data, point, NA_LENGTH);
             point += NA_LENGTH;
-            System.arraycopy(data, point, payload, 0, data.length - NRS_HEADER_LENGTH);
+            if (data.length > NRS_HEADER_LENGTH) {
+                payload = new byte[data.length - NRS_HEADER_LENGTH];
+                System.arraycopy(data, point, payload, 0, data.length - NRS_HEADER_LENGTH);
+            }
         } catch (Exception e) {
             logger.error(e.getMessage());
             e.printStackTrace();

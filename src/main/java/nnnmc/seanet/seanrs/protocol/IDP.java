@@ -131,7 +131,10 @@ public class IDP implements Message {
             point += EID_LENGTH;
             destEID = SocketUtil.bytesToHexString(data, point, EID_LENGTH);
             point += EID_LENGTH;
-            System.arraycopy(data, point, payload, 0, data.length - IDP_HEADER_LENGTH);
+            if (data.length > IDP_HEADER_LENGTH) {
+                payload = new byte[data.length - IDP_HEADER_LENGTH];
+                System.arraycopy(data, point, payload, 0, data.length - IDP_HEADER_LENGTH);
+            }
         } catch (Exception e) {
             logger.error(e.getMessage());
             e.printStackTrace();
