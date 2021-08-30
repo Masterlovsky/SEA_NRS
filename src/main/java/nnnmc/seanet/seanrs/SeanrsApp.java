@@ -345,7 +345,7 @@ public class SeanrsApp {
     }
 
     private FlowRule buildSetAddrAndGotoTableInstructionBlock(DeviceId deviceId, int offset, String ipAddress, int gotoTableId) {
-        log.debug("---------- build SetAddr&GotoTable instruction block for {} ----------", deviceId);
+        log.info("---------- build SetAddr&GotoTable instruction block for {} ----------", deviceId);
         OFMatch20 ofMatch20 = new OFMatch20(FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 24 * 8, 16 * 8); // IPv6 dstAddr
         InstructionBlockModTreatment instructionBlockModTreatment = new InstructionBlockModTreatment();
         instructionBlockModTreatment.addInstruction(new OFInstructionSetField(ofMatch20, ipAddress));
@@ -790,6 +790,7 @@ public class SeanrsApp {
                             {
                                 FlowRule blockFlowRule = buildSetAddrAndGotoTableInstructionBlock(deviceId, 0, na, mobility_tableid_for_ipv6);
                                 flowRuleService.applyFlowRules(blockFlowRule);
+                                log.info("===================== buildSetAddrAndGotoTableInstructionBlock: ");
                                 instructionBlockSentCache.add(blockFlowRule);
                                 instructionBlockInstalledCache.add(blockFlowRule);
                             }
@@ -805,7 +806,7 @@ public class SeanrsApp {
                                 instructionBlockSentCache.add(blockFlowRule);
                                 instructionBlockInstalledCache.add(blockFlowRule);
                             }
-                            log.info("===========allInstructionBlocksInstalled(deviceId): " + allInstructionBlocksInstalled(deviceId));
+                            log.info("=========== allInstructionBlocksInstalled(deviceId): " + allInstructionBlocksInstalled(deviceId));
                             String finalNa = na;
                             executor.execute(()->{
                                 if (allInstructionBlocksInstalled(deviceId)) {
