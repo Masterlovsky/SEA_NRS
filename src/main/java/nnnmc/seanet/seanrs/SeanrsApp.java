@@ -631,11 +631,11 @@ public class SeanrsApp {
             InboundPacket pkt = context.inPacket();
             ConnectPoint ingressPort = pkt.receivedFrom();
             Interface anInterface = interfaceService.getInterfacesByPort(ingressPort).stream().findFirst().orElse(null);
-            log.info("################## anInterface: " + anInterface);
+            log.info("########### anInterface: " + anInterface + " #############");
             IpAddress ipAddress = Objects.requireNonNull(anInterface).ipAddressesList().get(1).ipAddress();
             String fromSwitchIP = ipAddress.toInetAddress().getHostAddress();
             String fromSwitchIP_hex = HexUtil.ip2HexString(fromSwitchIP, 32);
-            log.info("################## fromSwitchIP_hex: " + fromSwitchIP_hex);
+            log.info("########### fromSwitchIP_hex: " + fromSwitchIP_hex + " ###########");
             DeviceId deviceId = ingressPort.deviceId();
             Ethernet ethPkt = pkt.parsed();
             // TODO: 2021/8/22 Vlan 和 Qinq 先不处理
@@ -697,6 +697,8 @@ public class SeanrsApp {
                                     String BGP_NA = bgp_Na_List.get(0); // TODO: 2021/8/23 暂时从BGP列表中选取选取第一个发送
                                     ipv6Pkt.setDestinationAddress(SocketUtil.hexStringToBytes(HexUtil.ip2HexString(BGP_NA, 32)));
                                     ethPkt.setPayload(ipv6Pkt);
+                                    log.info("########## register success! ready to send packet: {} to BGP: {} #########",
+                                            SocketUtil.bytesToHexString(ethPkt.serialize()), BGP_NA);
                                 } else {
                                     flag = false;
                                     log.error("Receive IRS register/deregister response status is not success");
