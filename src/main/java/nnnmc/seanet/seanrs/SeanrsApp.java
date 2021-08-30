@@ -671,7 +671,7 @@ public class SeanrsApp {
                             String sendToIRSMsg = Util.msgFormat1ToIRSFormat(SocketUtil.bytesToHexString(payload));
                             byte[] receive = SendAndRecv.throughUDP(HexUtil.ip2HexString(irsNa, 32), irsPort, SocketUtil.hexStringToBytes(sendToIRSMsg));
                             if (receive != null) {
-                                log.info("########## receive irs register/deregister response: {} ##########", SocketUtil.bytesToHexString(receive));
+                                log.debug("########## receive irs register/deregister response: {} ##########", SocketUtil.bytesToHexString(receive));
                                 if (Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).startsWith("01", 10)) {
                                     // 注册或注销成功，改payload为格式2，转发给BGP, 控制器不返回注册注销响应报文
                                     int total_len = 1 + 20 + 16 + 16 + 4 + bgpNum * 16;
@@ -697,8 +697,8 @@ public class SeanrsApp {
                                     String BGP_NA = bgp_Na_List.get(0); // TODO: 2021/8/23 暂时从BGP列表中选取选取第一个发送
                                     ipv6Pkt.setDestinationAddress(SocketUtil.hexStringToBytes(HexUtil.ip2HexString(BGP_NA, 32)));
                                     ethPkt.setPayload(ipv6Pkt);
-                                    log.info("########## {} success! ready to send packet: {} to BGP: {} #########",
-                                            queryType.equals("01") ? "register" : "deregister", SocketUtil.bytesToHexString(ethPkt.serialize()), BGP_NA);
+                                    log.info("########## register/deregister success! ready to send packet: {} to BGP: {} #########",
+                                            SocketUtil.bytesToHexString(ethPkt.serialize()), BGP_NA);
                                 } else {
                                     flag = false;
                                     log.error("Receive IRS register/deregister response status is not success");
