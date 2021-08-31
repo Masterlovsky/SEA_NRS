@@ -808,7 +808,7 @@ public class SeanrsApp {
                                             SocketUtil.bytesToHexString(ethPkt.serialize()), BGP_NA);
                                 } else {
                                     flag = false;
-                                    log.error("Receive IRS register/deregister response status is not success");
+                                    log.error("Receive IRS register/deregister response status is failed");
                                 }
                             } else {
                                 flag = false;
@@ -846,7 +846,7 @@ public class SeanrsApp {
                             // 收到BGP发来的注册/注销失败响应报文（格式2），反操作注册注销
                             String sendToIRSMsg = Util.msgFormat2ToIRSFormat(SocketUtil.bytesToHexString(payload));
                             byte[] receive = SendAndRecv.throughUDP(HexUtil.ip2HexString(irsNa, 32), irsPort, SocketUtil.hexStringToBytes(sendToIRSMsg));
-                            if (receive != null && Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).startsWith("01", 2)) {
+                            if (receive != null && Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).startsWith("01", 10)) {
                                 // 转发给用户注册/注销失败响应报文，响应报文（格式1）
                                 byte[] payload_format1 = new byte[38];
                                 System.arraycopy(payload, 0, payload_format1, 0, payload_format1.length);
@@ -859,7 +859,7 @@ public class SeanrsApp {
                                 log.warn("########## register/deregister failed in bgp, ready to send to client response packet(format1): " +
                                         "{} ##########", SocketUtil.bytesToHexString(ethPkt.serialize()));
                             } else {
-                                log.error("IRS don't response correctly");
+                                log.error("IRS don't response correctly, status is not '01'");
                             }
                         }
                     }
