@@ -127,6 +127,7 @@ public class SeanrsApp {
     private final InternalDeviceListener deviceListener = new InternalDeviceListener();
     private final InternalMastershipListener mastershipListener = new InternalMastershipListener();
     private final SeaNRSPacketProcessor processor = new SeaNRSPacketProcessor();
+    private final HashMap<DeviceId, ArrayList<String>> deviceInterfacesMap = new HashMap<>();
 
     private ExecutorService executor;
 
@@ -158,15 +159,19 @@ public class SeanrsApp {
 
         appId = coreService.registerApplication("org.onosproject.sea_nrs");
         local = clusterService.getLocalNode().id();
-        for (Interface anInterface : interfaceService.getInterfaces()) {
-            for (InterfaceIpAddress interfaceIpAddress : anInterface.ipAddressesList()) {
-                Ip6Address ip6Address = interfaceIpAddress.ipAddress().getIp6Address();
-                if (ip6Address != null) {
-                    log.info("ip: " + ip6Address);
-                    log.info(HexUtil.ip2HexString(ip6Address.toString(), 32));
+        for (Device device : deviceService.getAvailableDevices()) {
+            ArrayList<String> interfaceList = new ArrayList<>();
+            for (Interface anInterface : interfaceService.getInterfacesByDeviceId(device.id())) {
+                for (InterfaceIpAddress interfaceIpAddress : anInterface.ipAddressesList()) {
+                    Ip6Address ip6Address = interfaceIpAddress.ipAddress().getIp6Address();
+                    if (ip6Address != null) {
+                        interfaceList.add(HexUtil.ip2HexString(ip6Address.toString(), 32));
+                    }
                 }
             }
+            deviceInterfacesMap.put(device.id(), interfaceList);
         }
+        log.info(deviceInterfacesMap.toString());
 
         instructionBlockSentCache.clear();
         instructionBlockInstalledCache.clear();
