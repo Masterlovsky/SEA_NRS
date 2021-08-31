@@ -776,6 +776,8 @@ public class SeanrsApp {
                             ipv6Pkt.setDestinationAddress(ipv6Pkt.getSourceAddress());
                             ipv6Pkt.setSourceAddress(SocketUtil.hexStringToBytes(fromSwitchIP_hex));
                             ethPkt.setPayload(ipv6Pkt);
+                            log.warn("########## register/deregister failed in controller, ready to send to client response packet(format1): " +
+                                    "{} ##########", SocketUtil.bytesToHexString(ethPkt.serialize()));
                         }
                     }
 
@@ -783,11 +785,11 @@ public class SeanrsApp {
                     else if (queryType.equals("03") || queryType.equals("04")) {
                         byte[] payload = nrsPkt.getPayload();
                         if (payload != null && nrsPkt.getSource() == 0x01) {
-                            // 收到BGP发来的注册/注销失败响应报文，反操作注册注销
+                            // 收到BGP发来的注册/注销失败响应报文（格式2），反操作注册注销
                             String sendToIRSMsg = Util.msgFormat2ToIRSFormat(SocketUtil.bytesToHexString(payload));
                             byte[] receive = SendAndRecv.throughUDP(HexUtil.ip2HexString(irsNa, 32), irsPort, SocketUtil.hexStringToBytes(sendToIRSMsg));
                             if (receive != null && Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).startsWith("01", 2)) {
-                                // 转发给用户注册/注销失败响应报文，响应报文格式1
+                                // 转发给用户注册/注销失败响应报文，响应报文（格式1）
                                 byte[] payload_format1 = new byte[38];
                                 System.arraycopy(payload, 0, payload_format1, 0, payload_format1.length);
                                 nrsPkt.setPayload(payload_format1);
@@ -796,6 +798,8 @@ public class SeanrsApp {
                                 ipv6Pkt.setDestinationAddress(Arrays.copyOfRange(payload, 22, 38));
                                 ipv6Pkt.setPayload(new Data(idpPkt.pack()));
                                 ethPkt.setPayload(ipv6Pkt);
+                                log.warn("########## register/deregister failed in bgp, ready to send to client response packet(format1): " +
+                                        "{} ##########", SocketUtil.bytesToHexString(ethPkt.serialize()));
                             } else {
                                 log.error("IRS don't response correctly");
                             }

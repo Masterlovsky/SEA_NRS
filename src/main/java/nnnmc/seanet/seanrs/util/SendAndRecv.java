@@ -19,7 +19,7 @@ public class SendAndRecv extends Thread {
     public byte[] req;
     public int timeout;
     public int protocol;
-    private static final int defaultSocketTimeout = 1000;
+    private static final int defaultSocketTimeout = 5000;
 
     public SendAndRecv(int protocol, String na, int port, byte[] req) {
         this(protocol, na, port, req, defaultSocketTimeout);
