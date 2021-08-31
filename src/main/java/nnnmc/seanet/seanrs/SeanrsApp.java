@@ -7,10 +7,7 @@ import nnnmc.seanet.seanrs.util.HexUtil;
 import nnnmc.seanet.seanrs.util.SendAndRecv;
 import nnnmc.seanet.seanrs.util.SocketUtil;
 import nnnmc.seanet.seanrs.util.Util;
-import org.onlab.packet.Data;
-import org.onlab.packet.Ethernet;
-import org.onlab.packet.IPv6;
-import org.onlab.packet.IpAddress;
+import org.onlab.packet.*;
 import org.onlab.util.Tools;
 import org.onosproject.cfg.ComponentConfigService;
 import org.onosproject.cluster.ClusterService;
@@ -30,6 +27,7 @@ import org.onosproject.net.device.DeviceEvent;
 import org.onosproject.net.device.DeviceListener;
 import org.onosproject.net.device.DeviceService;
 import org.onosproject.net.flow.*;
+import org.onosproject.net.host.InterfaceIpAddress;
 import org.onosproject.net.intf.Interface;
 import org.onosproject.net.intf.InterfaceService;
 import org.onosproject.net.packet.*;
@@ -160,6 +158,15 @@ public class SeanrsApp {
 
         appId = coreService.registerApplication("org.onosproject.sea_nrs");
         local = clusterService.getLocalNode().id();
+        for (Interface anInterface : interfaceService.getInterfaces()) {
+            for (InterfaceIpAddress interfaceIpAddress : anInterface.ipAddressesList()) {
+                Ip6Address ip6Address = interfaceIpAddress.ipAddress().getIp6Address();
+                if (ip6Address != null) {
+                    log.info("ip: " + ip6Address);
+                    log.info(HexUtil.ip2HexString(ip6Address.toString(), 32));
+                }
+            }
+        }
 
         instructionBlockSentCache.clear();
         instructionBlockInstalledCache.clear();
