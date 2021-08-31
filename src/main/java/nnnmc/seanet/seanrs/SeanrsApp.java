@@ -171,7 +171,7 @@ public class SeanrsApp {
             }
             deviceInterfacesMap.put(device.id(), interfaceList);
         }
-        log.info(deviceInterfacesMap.toString());
+        log.debug("device: [interfaces]: {}", deviceInterfacesMap);
 
         instructionBlockSentCache.clear();
         instructionBlockInstalledCache.clear();
@@ -413,6 +413,13 @@ public class SeanrsApp {
             addPacketInFlowEntry(deviceId, seanrs_tableid_ipv6);
             addPacketInFlowEntry(deviceId, seanrs_tableid_vlan);
             addPacketInFlowEntry(deviceId, seanrs_tableid_qinq);
+            for (DeviceId id : deviceInterfacesMap.keySet()) {
+                for (String ipAddr : deviceInterfacesMap.get(id)) {
+                    addMatchLocalIPAndPacketInFlowEntry(id, seanrs_tableid_ipv6, ipAddr);
+                    addMatchLocalIPAndPacketInFlowEntry(id, seanrs_tableid_vlan, ipAddr);
+                    addMatchLocalIPAndPacketInFlowEntry(id, seanrs_tableid_qinq, ipAddr);
+                }
+            }
             addDefaultGoToTableFlowEntry(deviceId, seanrs_tableid_ipv6, mobility_tableid_for_ipv6);
             addDefaultGoToTableFlowEntry(deviceId, seanrs_tableid_vlan, MobilityTableID_for_Vlan);
             addDefaultGoToTableFlowEntry(deviceId, seanrs_tableid_qinq, MobilityTableID_for_Qinq);
@@ -433,6 +440,45 @@ public class SeanrsApp {
         // construct selector
         OFMatchXSelector selector = new OFMatchXSelector();
         selector.addOFMatchX("IPV6_DST", FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + (24 * 8), (16 * 8), NA_ZEROS, HexUtil.duplicates('F', 32));
+        selector.addOFMatchX("NRS_NextHeader", FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + (40 * 8), (8), "10", "FF");
+        selector.addOFMatchX("destEID16", FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 64 * 8, 16 * 8, HexUtil.zeros(32), HexUtil.zeros(32)); // DEST_EID (1-16Byte)
+        selector.addOFMatchX("destEID4", FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 80 * 8, 4 * 8, HexUtil.zeros(8), HexUtil.zeros(8)); // DEST_EID (16-20Byte)
+        TrafficSelector.Builder trafficSelectorBuilder = DefaultTrafficSelector.builder();
+        trafficSelectorBuilder.extension(selector, deviceId);
+
+        FlowModTreatment flowModTreatment = new FlowModTreatment(buildPacketInInstructionBlock(deviceId).id().value());
+
+        //construct treatment
+        TrafficTreatment.Builder trafficTreatmentBuilder = DefaultTrafficTreatment.builder();
+        trafficTreatmentBuilder.extension(flowModTreatment, deviceId);
+
+
+        FlowRule flowRule = new PofFlowRuleBuilder()
+                .fromApp(appId)
+                .forDevice(deviceId)
+                .forTable(tableId)
+                .withSelector(trafficSelectorBuilder.build())
+                .withTreatment(trafficTreatmentBuilder.build())
+                .withPriority(PKTIN_PRIORITY)
+                .makePermanent()
+                .makeStored(false)
+                .build();
+        flowEntrySentCache.add(flowRule);
+        flowRuleService.applyFlowRules(flowRule);
+    }
+
+    private void addMatchLocalIPAndPacketInFlowEntry(DeviceId deviceId, int tableId, String localIp) {
+        log.debug("---------- add Match Local IP And PacketIn flow entry for table{}, device:{} ----------", tableId, deviceId);
+        // packet offset
+        int offset = 0;
+        if (tableId == seanrs_tableid_vlan) {
+            offset = 4;
+        } else if (tableId == seanrs_tableid_qinq) {
+            offset = 8;
+        }
+        // construct selector
+        OFMatchXSelector selector = new OFMatchXSelector();
+        selector.addOFMatchX("IPV6_DST", FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + (24 * 8), (16 * 8), localIp, HexUtil.duplicates('F', 32));
         selector.addOFMatchX("NRS_NextHeader", FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + (40 * 8), (8), "10", "FF");
         selector.addOFMatchX("destEID16", FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 64 * 8, 16 * 8, HexUtil.zeros(32), HexUtil.zeros(32)); // DEST_EID (1-16Byte)
         selector.addOFMatchX("destEID4", FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 80 * 8, 4 * 8, HexUtil.zeros(8), HexUtil.zeros(8)); // DEST_EID (16-20Byte)
