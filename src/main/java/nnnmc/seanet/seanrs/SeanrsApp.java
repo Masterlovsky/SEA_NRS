@@ -20,10 +20,14 @@ import org.onosproject.core.CoreService;
 import org.onosproject.floodlightpof.protocol.OFMatch20;
 import org.onosproject.floodlightpof.protocol.instruction.*;
 import org.onosproject.floodlightpof.protocol.table.OFTableType;
+import org.onosproject.mastership.MastershipEvent;
+import org.onosproject.mastership.MastershipListener;
 import org.onosproject.mastership.MastershipService;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.Device;
 import org.onosproject.net.DeviceId;
+import org.onosproject.net.device.DeviceEvent;
+import org.onosproject.net.device.DeviceListener;
 import org.onosproject.net.device.DeviceService;
 import org.onosproject.net.flow.*;
 import org.onosproject.net.intf.Interface;
@@ -122,9 +126,14 @@ public class SeanrsApp {
     private final FlowRuleCache tableInstalledCache = new FlowRuleCache();
 
     private final SeaNRSFlowRuleListener flowRuleListener = new SeaNRSFlowRuleListener();
+    private final InternalDeviceListener deviceListener = new InternalDeviceListener();
+    private final InternalMastershipListener mastershipListener = new InternalMastershipListener();
     private final SeaNRSPacketProcessor processor = new SeaNRSPacketProcessor();
 
     private ExecutorService executor;
+
+    protected ApplicationId appId;
+    private NodeId local;
 
     private void readComponentConfiguration(ComponentContext context) {
         Dictionary<?, ?> properties = context.getProperties();
@@ -141,14 +150,10 @@ public class SeanrsApp {
         MobilityTableID_for_Qinq = mobility_tableid_for_ipv6 + 20;
     }
 
-
     @Modified
     public void modified(ComponentContext context) {
         readComponentConfiguration(context);
     }
-
-    protected ApplicationId appId;
-    private NodeId local;
 
     @Activate
     public void activate(ComponentContext context) {
@@ -164,6 +169,8 @@ public class SeanrsApp {
 
         executor = Executors.newSingleThreadExecutor(groupedThreads("onos/seanet/sea_nrs", "main", log));
         flowRuleService.addListener(flowRuleListener);
+        deviceService.addListener(deviceListener);
+        mastershipService.addListener(mastershipListener);
 
         componentConfigService.registerProperties(getClass());
         modified(context);
@@ -185,7 +192,6 @@ public class SeanrsApp {
         log.info("============== Sea_NRS app activate! ==============");
     }
 
-
     @Deactivate
     public void deactivate(ComponentContext context) {
         //Before stopping the application, we first need to delete the entry delivered by the application on the switch
@@ -200,6 +206,8 @@ public class SeanrsApp {
         flowRuleService.removeFlowRulesById(appId);
         packetService.removeProcessor(processor);
         flowRuleService.removeListener(flowRuleListener);
+        deviceService.removeListener(deviceListener);
+        mastershipService.removeListener(mastershipListener);
 
         componentConfigService.unregisterProperties(getClass(), false);
         executor.shutdown();
@@ -375,27 +383,6 @@ public class SeanrsApp {
         return blockFlowRule;
     }
 
-    private FlowRule buildOutputInstructionBlock(DeviceId deviceId) {
-        TrafficTreatment.Builder trafficTreatmentBuilder = DefaultTrafficTreatment.builder();
-        InstructionBlockModTreatment instructionBlockModTreatment = new InstructionBlockModTreatment();
-        try {
-            // 从交换机port 1转出
-            instructionBlockModTreatment.addInstruction(new OFInstructionOutput(OutPutType.OUTP, 0, 1));
-            trafficTreatmentBuilder.extension(instructionBlockModTreatment, deviceId);
-        } catch (Exception e) {
-            log.info("BuildOutputInstructionBlock Faild");
-        }
-
-        FlowRule blockFlowRule = new PofFlowRuleBuilder()
-                .fromApp(appId)
-                .forDevice(deviceId)
-                .withTreatment(trafficTreatmentBuilder.build())
-                .makeStored(false)
-                .build();
-
-        return blockFlowRule;
-    }
-
     private boolean allInstructionBlocksInstalled(DeviceId deviceId) {
         boolean instructionBlockInstalled;
         if (instructionBlockSentCache.size(deviceId) == 0) {
@@ -537,29 +524,7 @@ public class SeanrsApp {
         flowRuleService.applyFlowRules(flowRule);
     }
 
-    // ====================== process =========================
-    /**
-     * 对于设备标识为DeviceId的某设备，用函数getProcessStatusByDeviceId判断fibApp是否下发过表项，
-     * 下发过则调用processedSetAdd函数将其记录在processedDeviceIdSet中；
-     * 当设备下线后，调用resetStatusByDeviceId函数，将该设备的DeviceId从processedDeviceIdSet中移出。以此来避免重复下发表项
-     */
-    private final CopyOnWriteArraySet<DeviceId> processedDeviceIdSet = new CopyOnWriteArraySet<>();
-
-    public synchronized void processedSetAdd(DeviceId deviceId) {
-        processedDeviceIdSet.add(deviceId);
-    }
-
-    public synchronized void resetStatusByDeviceId(DeviceId deviceId) {
-        if (!processedDeviceIdSet.isEmpty()) {
-            processedDeviceIdSet.remove(deviceId);
-        }
-    }
-
-    public synchronized boolean getProcessStatusByDeviceId(DeviceId deviceId) {
-        boolean processed = !processedDeviceIdSet.isEmpty() && processedDeviceIdSet.contains(deviceId);
-        return processed;
-    }
-
+    // ====================== listener =========================
 
     /**
      * listener 监听所有flowRule相关事件，包括流表的添加和删除、指令块儿的添加和删除、表项的添加和删除都会触发这个listener
@@ -571,7 +536,6 @@ public class SeanrsApp {
             //noinspection SwitchStatementWithTooFewBranches
             switch (event.type()) {
                 // case RULE_ADDED:
-                // case RULE_UPDATED:
                 case RULE_ADD_REQUESTED: {
                     DeviceId deviceId = rule.deviceId();
                     if (deviceId.toString().startsWith("pof")) {
@@ -616,6 +580,91 @@ public class SeanrsApp {
         }
     }
 
+    private class InternalDeviceListener implements DeviceListener {
+        @Override
+        public void event(DeviceEvent event) {
+            //noinspection SwitchStatementWithTooFewBranches
+            switch (event.type()) {
+                case DEVICE_AVAILABILITY_CHANGED: {
+                    executor.execute(() -> {
+                        DeviceId deviceId = event.subject().id();
+                        log.debug("seanet switch deviceId={}, deviceService.isAvailable(deviceId)={}, tableInstalledCache.size(deviceId)={}",
+                                deviceId, deviceService.isAvailable(deviceId), tableInstalledCache.size(deviceId));
+                        if (!deviceService.isAvailable(deviceId)) {
+                            removeOldFlowRules(deviceId);
+                            flowEntrySentCache.remove(deviceId);
+                            instructionBlockSentCache.remove(deviceId);
+                            tableSentCache.remove(deviceId);
+                            instructionBlockInstalledCache.remove(deviceId);
+                            tableInstalledCache.remove(deviceId);
+                            resetStatusByDeviceId(deviceId);
+                            log.debug("init DeviceEvent : deviceId={}, event.type()={}, event.subject()={}, tableInstalledCache.size(deviceId)={}.",
+                                    deviceId, event.type(), event.subject(), tableInstalledCache.size(deviceId));
+                        }
+                    });
+                }
+                break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    private class InternalMastershipListener implements MastershipListener {
+        @Override
+        public void event(MastershipEvent event) {
+            DeviceId deviceId = event.subject();
+            //noinspection SwitchStatementWithTooFewBranches
+            switch (event.type()) {
+                case MASTER_CHANGED:
+                {
+                    NodeId master = mastershipService.getMasterFor(deviceId);
+                    if(deviceId.toString().startsWith("pof")) {
+                        if(Objects.equals(local, master) && (tableSentCache.size(deviceId)==0)) {
+                            buildNRSTables(deviceId);
+                        }
+                        else{
+                            executor.execute(() -> {
+                                removeOldFlowRules(deviceId);
+                                instructionBlockSentCache.remove(deviceId);
+                                instructionBlockInstalledCache.remove(deviceId);
+                                flowEntrySentCache.remove(deviceId);
+                                tableSentCache.remove(deviceId);
+                                tableInstalledCache.remove(deviceId);
+                            });
+                        }
+                    }
+                }
+                break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    // ====================== processor =========================
+
+    /**
+     * 对于设备标识为DeviceId的某设备，用函数getProcessStatusByDeviceId判断fibApp是否下发过表项，
+     * 下发过则调用processedSetAdd函数将其记录在processedDeviceIdSet中；
+     * 当设备下线后，调用resetStatusByDeviceId函数，将该设备的DeviceId从processedDeviceIdSet中移出。以此来避免重复下发表项
+     */
+    private final CopyOnWriteArraySet<DeviceId> processedDeviceIdSet = new CopyOnWriteArraySet<>();
+
+    public synchronized void processedSetAdd(DeviceId deviceId) {
+        processedDeviceIdSet.add(deviceId);
+    }
+
+    public synchronized void resetStatusByDeviceId(DeviceId deviceId) {
+        if (!processedDeviceIdSet.isEmpty()) {
+            processedDeviceIdSet.remove(deviceId);
+        }
+    }
+
+    public synchronized boolean getProcessStatusByDeviceId(DeviceId deviceId) {
+        boolean processed = !processedDeviceIdSet.isEmpty() && processedDeviceIdSet.contains(deviceId);
+        return processed;
+    }
 
     // TODO: 2021/7/24 这里是重点，根据packetEID改ip，然后goto Mobility表, 进行后续业务逻辑
     private class SeaNRSPacketProcessor implements PacketProcessor {
