@@ -6,7 +6,7 @@ public class Util {
     public static String getRandomRequestID() {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < 8; i++) {
-            long ran = Math.round(Math.random() * 10);
+            int ran = (int) Math.floor(Math.random() * 10);
             sb.append(ran);
         }
         return sb.toString();
@@ -46,5 +46,11 @@ public class Util {
             msg = type + Util.getRandomRequestID() + "00" + payload.substring(4, 76) + Util.getTimestamp();
         }
         return msg;
+    }
+
+    public static void main(String[] args) {
+        for (int i = 0; i < 1000; i++) {
+            System.out.println(getRandomRequestID());
+        }
     }
 }
