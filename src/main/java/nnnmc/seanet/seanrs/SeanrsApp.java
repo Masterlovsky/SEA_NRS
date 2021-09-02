@@ -902,7 +902,7 @@ public class SeanrsApp {
                         }
                         ipv6Pkt.setDestinationAddress(SocketUtil.hexStringToBytes(na));
                         ethPkt.setPayload(ipv6Pkt);
-                        // TODO: 2021/8/30 是否下发流表项，下发策略？ 现在这些指令块儿和表项下不成功。。。
+                        // TODO: 2021/8/30 是否下发流表项，下发策略？
                         if (dstEid != null) {
                             {
                                 FlowRule blockFlowRule = buildSetAddrAndGotoTableInstructionBlock(deviceId, 0, na, mobility_tableid_for_ipv6);
