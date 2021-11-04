@@ -29,7 +29,7 @@ public final class OsgiPropertyConstants {
     public static final int MOBILITY_TABLE_BASE_ID_DEFAULT = 2;
 
     public static final String TABLESIZE = "tableSize";
-    public static final int SIZE_DEFAULT = 1024 * 64;
+    public static final int SIZE_DEFAULT = 1024 * 64 - 1;
 
     public static final String IRS_NA_NAME = "irsNa";
     public static final String IRS_NA_DEFAULT = "2400:dd01:1037:201:192:168:47:191";
@@ -41,6 +41,5 @@ public final class OsgiPropertyConstants {
     public static final int BGP_NUM_DEFAULT = 1;
 
     public static final String BGP_NA_NAME = "bgpNaStr";
-    // BGP_NA is comma-separated
-    public static final String BGP_NA = "2400:dd01:1037:10:20:0:0:20,2400:dd01:1037:10:20:0:0:20";
+    public static final String BGP_NA = "2400:dd01:1037:10:20:0:0:20";
 }
