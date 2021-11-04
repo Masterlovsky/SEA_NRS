@@ -41,5 +41,6 @@ public final class OsgiPropertyConstants {
     public static final int BGP_NUM_DEFAULT = 1;
 
     public static final String BGP_NA_NAME = "bgpNaStr";
-    public static final String BGP_NA = "2400:dd01:1037:10:20::20"; // BGP_NA is comma-separated
+    // BGP_NA is comma-separated
+    public static final String BGP_NA = "2400:dd01:1037:10:20:0:0:20,2400:dd01:1037:10:20:0:0:20";
 }
