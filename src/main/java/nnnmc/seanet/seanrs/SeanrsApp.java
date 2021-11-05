@@ -110,6 +110,7 @@ public class SeanrsApp {
     private static final int FORWARD_PRIORITY = 5000;
     private static final int ETH_HEADER_LEN = 14 * 8;
     private static final int FIRST_TABLE = 0;
+    private static final int FIB_TABLE = 2;
     private static final String NA_ZEROS = HexUtil.zeros(32);
     private static int tableSize = SIZE_DEFAULT;
     private static String irsNa = IRS_NA_DEFAULT;
@@ -247,7 +248,7 @@ public class SeanrsApp {
     private void buildNRSTables(DeviceId deviceId) {
         log.info("========== build Table 0 for device {} ==========", deviceId);
         {
-            FlowRule table0 = createFirstTable(deviceId, FIRST_TABLE, 0); //table0
+            FlowRule table0 = createFirstTable(deviceId, FIRST_TABLE); //table0
             flowRuleService.applyFlowRules(table0);
             tableSentCache.add(table0);
         }
@@ -267,6 +268,13 @@ public class SeanrsApp {
             FlowRule table21 = createNRSTable(deviceId, seanrs_tableid_qinq, 8);//qinq
             flowRuleService.applyFlowRules(table21);
             tableSentCache.add(table21);
+        }
+
+        log.info("========== build Table 2 for device {} ==========", deviceId);
+        {
+            FlowRule table2 = createFibTable(deviceId, FIB_TABLE, 0); //table0
+            flowRuleService.applyFlowRules(table2);
+            tableSentCache.add(table2);
         }
     }
 
@@ -295,18 +303,40 @@ public class SeanrsApp {
         return flowRule;
     }
 
-    private FlowRule createFirstTable(DeviceId deviceId, int tableId, int offset) {
+    private FlowRule createFirstTable(DeviceId deviceId, int tableId) {
         log.debug("-- createFirstTable{}, in {} begin --", tableId, deviceId);
 
         OFMatch20Selector selector = new OFMatch20Selector();
         selector.addOFMatch20(FieldId.PACKET, 12 * 8, 2 * 8); // ETH_TYPE
-        selector.addOFMatch20(FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 40 * 8, 8); // IDP_NextHeader
+        selector.addOFMatch20(FieldId.PACKET, ETH_HEADER_LEN + 40 * 8, 8); // IDP_NextHeader
 
         TrafficSelector.Builder trafficSelectorBuilder = DefaultTrafficSelector.builder();
         trafficSelectorBuilder.extension(selector, deviceId);
 
         TrafficTreatment.Builder trafficTreatmentBuilder = DefaultTrafficTreatment.builder();
         trafficTreatmentBuilder.extension(new TableModTreatment(OFTableType.OF_MM_TABLE, tableSize, "FirstTable"), deviceId);
+        PofFlowRuleBuilder builder = new PofFlowRuleBuilder();
+        FlowRule flowRule = builder
+                .fromApp(appId)
+                .forDevice(deviceId)
+                .forTable(tableId)
+                .withSelector(trafficSelectorBuilder.build())
+                .withTreatment(trafficTreatmentBuilder.build())
+                .build();
+        return flowRule;
+    }
+
+    private FlowRule createFibTable(DeviceId deviceId, int tableId, int offset) {
+        log.debug("-- createFibTable{}, in {} begin --", tableId, deviceId);
+
+        OFMatch20Selector selector = new OFMatch20Selector();
+        selector.addOFMatch20(FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 24 * 8, 16 * 8); // DEST_IPV6_ADDR
+
+        TrafficSelector.Builder trafficSelectorBuilder = DefaultTrafficSelector.builder();
+        trafficSelectorBuilder.extension(selector, deviceId);
+
+        TrafficTreatment.Builder trafficTreatmentBuilder = DefaultTrafficTreatment.builder();
+        trafficTreatmentBuilder.extension(new TableModTreatment(OFTableType.OF_MM_TABLE, tableSize, "FibTable"), deviceId);
         PofFlowRuleBuilder builder = new PofFlowRuleBuilder();
         FlowRule flowRule = builder
                 .fromApp(appId)
@@ -375,6 +405,16 @@ public class SeanrsApp {
             instructionBlockSentCache.add(blockFlowRule);
         }
         {
+            FlowRule blockFlowRule = buildOutpInstructionBlock(deviceId, 0);
+            flowRuleService.applyFlowRules(blockFlowRule);
+            instructionBlockSentCache.add(blockFlowRule);
+        }
+        {
+            FlowRule blockFlowRule = buildOutpInstructionBlock(deviceId, 1);
+            flowRuleService.applyFlowRules(blockFlowRule);
+            instructionBlockSentCache.add(blockFlowRule);
+        }
+        {
             FlowRule blockFlowRule = buildGotoTableInstructionBlock(deviceId, mobility_tableid_for_ipv6);
             flowRuleService.applyFlowRules(blockFlowRule);
             instructionBlockSentCache.add(blockFlowRule);
@@ -411,6 +451,21 @@ public class SeanrsApp {
         InstructionBlockModTreatment instructionBlockModTreatment = new InstructionBlockModTreatment();
 
         instructionBlockModTreatment.addInstruction(new OFInstructionDrop());
+        TrafficTreatment.Builder trafficTreatmentBuilder = DefaultTrafficTreatment.builder().extension(instructionBlockModTreatment, deviceId);
+
+        FlowRule blockFlowRule = new PofFlowRuleBuilder()
+                .fromApp(appId)
+                .forDevice(deviceId)
+                .withTreatment(trafficTreatmentBuilder.build())
+                .build();
+        return blockFlowRule;
+    }
+
+    private FlowRule buildOutpInstructionBlock(DeviceId deviceId, int portid) {
+        log.debug("---------- build Output instruction block for {} ----------", deviceId);
+        InstructionBlockModTreatment instructionBlockModTreatment = new InstructionBlockModTreatment();
+
+        instructionBlockModTreatment.addInstruction(new OFInstructionOutput(OutPutType.OUTP, portid));
         TrafficTreatment.Builder trafficTreatmentBuilder = DefaultTrafficTreatment.builder().extension(instructionBlockModTreatment, deviceId);
 
         FlowRule blockFlowRule = new PofFlowRuleBuilder()
@@ -470,7 +525,12 @@ public class SeanrsApp {
             addDropFlowEntry(deviceId, FIRST_TABLE);
             addFirstGoToTableFlowEntry(deviceId, FIRST_TABLE, mobility_tableid_for_ipv6, "00", PKTIN_PRIORITY);
             addFirstGoToTableFlowEntry(deviceId, FIRST_TABLE, seanrs_tableid_ipv6, "FF", FORWARD_PRIORITY);
-            // add packet_in entry for nrs_table
+
+//          add fib match ipv6_address action: output port entry for fib table
+            addMatchIPv6dstAndOutPFlowEntry(deviceId, FIB_TABLE, "2400dd01103700090009000000000009", "FFFFFFFFFFFFFFFF0000000000000000", 0);
+            addMatchIPv6dstAndOutPFlowEntry(deviceId, FIB_TABLE, "2400dd01103700100020000000000020", "FFFFFFFFFFFFFFFF0000000000000000", 1);
+
+//            add packet_in entry for nrs_table
             addPacketInFlowEntry(deviceId, seanrs_tableid_ipv6);
             addPacketInFlowEntry(deviceId, seanrs_tableid_vlan);
             addPacketInFlowEntry(deviceId, seanrs_tableid_qinq);
@@ -538,6 +598,35 @@ public class SeanrsApp {
         trafficSelectorBuilder.extension(selector, deviceId);
 
         FlowModTreatment flowModTreatment = new FlowModTreatment(buildDropInstructionBlock(deviceId).id().value());
+
+        //construct treatment
+        TrafficTreatment.Builder trafficTreatmentBuilder = DefaultTrafficTreatment.builder();
+        trafficTreatmentBuilder.extension(flowModTreatment, deviceId);
+
+
+        FlowRule flowRule = new PofFlowRuleBuilder()
+                .fromApp(appId)
+                .forDevice(deviceId)
+                .forTable(tableId)
+                .withSelector(trafficSelectorBuilder.build())
+                .withTreatment(trafficTreatmentBuilder.build())
+                .withPriority(DEFAULT_PRIORITY)
+                .makePermanent()
+                .makeStored(false)
+                .build();
+        flowEntrySentCache.add(flowRule);
+        flowRuleService.applyFlowRules(flowRule);
+    }
+
+    private void addMatchIPv6dstAndOutPFlowEntry(DeviceId deviceId, int tableId, String ipv6DstAddr, String mask, int outPort) {
+        log.debug("---------- add DROP flow entry for table{}, device:{} ----------", tableId, deviceId);
+        // construct selector
+        OFMatchXSelector selector = new OFMatchXSelector();
+        selector.addOFMatchX("IPv6_DST", FieldId.PACKET, ETH_HEADER_LEN + 24 * 8, 16 * 8, ipv6DstAddr, mask); // DEST_IPV6_ADDR
+        TrafficSelector.Builder trafficSelectorBuilder = DefaultTrafficSelector.builder();
+        trafficSelectorBuilder.extension(selector, deviceId);
+
+        FlowModTreatment flowModTreatment = new FlowModTreatment(buildOutpInstructionBlock(deviceId, outPort).id().value());
 
         //construct treatment
         TrafficTreatment.Builder trafficTreatmentBuilder = DefaultTrafficTreatment.builder();
