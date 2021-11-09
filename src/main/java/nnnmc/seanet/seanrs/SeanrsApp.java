@@ -1056,7 +1056,7 @@ public class SeanrsApp {
                             // 收到BGP发来的注册/注销失败响应报文（格式2），反操作注册注销
                             String sendToIRSMsg = Util.msgFormat2ToIRSFormat(SocketUtil.bytesToHexString(payload));
                             byte[] receive = SendAndRecv.throughUDP(HexUtil.ip2HexString(irsNa, 32), irsPort, SocketUtil.hexStringToBytes(sendToIRSMsg));
-                            log.info("++++++debug+++++, receive payload: " + SocketUtil.bytesToHexString(receive));
+                            log.info("++++++debug+++++, receive payload: " + SocketUtil.bytesToHexString(payload));
                             log.info("++++++debug+++++, receive from irs: " + SocketUtil.bytesToHexString(receive));
                             if (receive != null && Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).startsWith("01", 10)) {
                                 // 转发给用户注册/注销失败响应报文，响应报文（格式1）
