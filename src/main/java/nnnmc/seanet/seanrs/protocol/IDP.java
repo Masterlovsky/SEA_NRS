@@ -57,6 +57,7 @@ public class IDP implements Message {
         this.reserved = SocketUtil.bytesToHexString(packet, 2, 2);
         this.sourceEID = SocketUtil.bytesToHexString(packet, 4, EID_LENGTH);
         this.destEID = SocketUtil.bytesToHexString(packet, 24, EID_LENGTH);
+        this.payload = new byte[packet.length - IDP_HEADER_LENGTH];
         System.arraycopy(packet, IDP_HEADER_LENGTH, this.payload, 0, packet.length - IDP_HEADER_LENGTH);
         this.totalLen = IDP_HEADER_LENGTH + this.payload.length;
     }
@@ -66,7 +67,8 @@ public class IDP implements Message {
     }
 
     public void setPayload(byte[] payload) {
-        this.payload = payload;
+        this.payload = new byte[payload.length];
+        System.arraycopy(payload, 0, this.payload, 0, payload.length);
         this.totalLen = IDP_HEADER_LENGTH + payload.length;
     }
 

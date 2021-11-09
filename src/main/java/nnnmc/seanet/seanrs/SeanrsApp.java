@@ -1049,11 +1049,14 @@ public class SeanrsApp {
 
                     // TODO: 2021/8/25 register response or deregister response
                     else if (queryType.equals("03") || queryType.equals("04")) {
+                        // TODO: 2021/11/8 测试有bug！！！！！！！！！！！！！！！！！！！！！！
                         byte[] payload = nrsPkt.getPayload();
                         if (payload != null && nrsPkt.getSource() == 0x01) {
                             // 收到BGP发来的注册/注销失败响应报文（格式2），反操作注册注销
                             String sendToIRSMsg = Util.msgFormat2ToIRSFormat(SocketUtil.bytesToHexString(payload));
                             byte[] receive = SendAndRecv.throughUDP(HexUtil.ip2HexString(irsNa, 32), irsPort, SocketUtil.hexStringToBytes(sendToIRSMsg));
+                            log.info("++++++debug+++++, receive payload: " + SocketUtil.bytesToHexString(receive));
+                            log.info("++++++debug+++++, receive from irs: " + SocketUtil.bytesToHexString(receive));
                             if (receive != null && Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).startsWith("01", 10)) {
                                 // 转发给用户注册/注销失败响应报文，响应报文（格式1）
                                 byte[] payload_format1 = new byte[38];

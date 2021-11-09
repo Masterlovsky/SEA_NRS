@@ -49,6 +49,7 @@ public class NRS implements Message {
         this.bgpType = packet[2];
         this.source = packet[3];
         this.na = SocketUtil.bytesToHexString(packet, 4, NA_LENGTH);
+        this.payload = new byte[packet.length - NRS_HEADER_LENGTH];
         System.arraycopy(packet, NRS_HEADER_LENGTH, this.payload, 0, packet.length - NRS_HEADER_LENGTH);
         this.totalLength = NRS_HEADER_LENGTH + this.payload.length;
     }
@@ -86,7 +87,8 @@ public class NRS implements Message {
     }
 
     public void setPayload(byte[] payload) {
-        this.payload = payload;
+        this.payload = new byte[payload.length];
+        System.arraycopy(payload, 0, this.payload, 0, payload.length);
         this.totalLength = NRS_HEADER_LENGTH + payload.length;
     }
 
