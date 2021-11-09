@@ -107,7 +107,8 @@ public class SeanrsApp {
 
     private static final int DEFAULT_PRIORITY = 1000;
     private static final int PKTIN_PRIORITY = 2000;
-    private static final int FORWARD_PRIORITY = 5000;
+    private static final int LOCAL_PKTIN_PRIORITY = 5000;
+    private static final int FORWARD_PRIORITY = 3000;
     private static final int ETH_HEADER_LEN = 14 * 8;
     private static final int FIRST_TABLE = 0;
     private static final int FIB_TABLE = 2;
@@ -678,7 +679,7 @@ public class SeanrsApp {
                 .forTable(tableId)
                 .withSelector(trafficSelectorBuilder.build())
                 .withTreatment(trafficTreatmentBuilder.build())
-                .withPriority(PKTIN_PRIORITY)
+                .withPriority(LOCAL_PKTIN_PRIORITY)
                 .makePermanent()
                 .makeStored(false)
                 .build();
