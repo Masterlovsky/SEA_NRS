@@ -1030,8 +1030,10 @@ public class SeanrsApp {
                         // 如果注册/注销不成功，向用户发送注册/注销失败响应格式1
                         if (!flag) {
                             byte[] payload_format1 = new byte[38];
+                            String isRegister = "function";
                             if (payload != null) {
                                 String type = Objects.requireNonNull(SocketUtil.bytesToHexString(payload)).startsWith("6f") ? "70" : "74";
+                                isRegister = type.equals("70") ? "register" : "deregister";
                                 System.arraycopy(SocketUtil.hexStringToBytes(type), 0, payload_format1, 0, 1);
                                 System.arraycopy(SocketUtil.hexStringToBytes("00"), 0, payload_format1, 1, 1); // TODO: 2021/8/25 假设"00"表示失败
                                 System.arraycopy(payload, 1, payload_format1, 2, 36);
@@ -1043,8 +1045,11 @@ public class SeanrsApp {
                             ipv6Pkt.setDestinationAddress(ipv6Pkt.getSourceAddress());
                             ipv6Pkt.setSourceAddress(SocketUtil.hexStringToBytes(fromSwitchIP_hex));
                             ethPkt.setPayload(ipv6Pkt);
-                            log.warn("########## register/deregister failed in controller, ready to send to client response packet(format1): " +
-                                    "{} ##########", SocketUtil.bytesToHexString(ethPkt.serialize()));
+                            byte[] sourceMACAddress = ethPkt.getSourceMACAddress();
+                            ethPkt.setSourceMACAddress(ethPkt.getDestinationMACAddress());
+                            ethPkt.setDestinationMACAddress(sourceMACAddress);
+                            log.warn("########## {} failed in controller, ready to send to client response packet(format1): " +
+                                    "{} ##########", isRegister, SocketUtil.bytesToHexString(ethPkt.serialize()));
                         }
                     }
 
