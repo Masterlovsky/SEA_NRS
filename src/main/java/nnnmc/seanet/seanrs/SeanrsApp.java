@@ -1107,6 +1107,7 @@ public class SeanrsApp {
                                     idpPkt.setPayload(nrsPkt.pack());
                                     // TODO: 2021/11/22 -------------- 这里出现了NULLPointerException！------------------- 
                                     ipv6Pkt.setPayload(new Data(idpPkt.pack()));
+                                    log.warn("mzl_debug->payload: " + SocketUtil.bytesToHexString(ipv6Pkt.getPayload().serialize()));
                                 } else {
                                     log.error("packet source is unknown!");
                                 }
