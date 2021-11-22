@@ -1083,8 +1083,8 @@ public class SeanrsApp {
 //                        byte[] payload = nrsPkt.getPayload().serialize();
                         // 发送给解析单点解析请求 TODO: 暂时未考虑tag解析
                         String resolveMsg = "71" + "000000" + Util.getRandomRequestID() + dstEid + Util.getTimestamp();
-                        log.info("############# irsNa: " + HexUtil.ip2HexString(irsNa, 32) + " ############");
                         byte[] receive = SendAndRecv.throughUDP(HexUtil.ip2HexString(irsNa, 32), irsPort, SocketUtil.hexStringToBytes(resolveMsg));
+                        log.info(">>>> receive from irs: " + SocketUtil.bytesToHexString(receive) + " <<<<");
                         String na = HexUtil.zeros(32);
                         if (receive[1] == 1) {
                             int na_num = SocketUtil.byteArrayToInt(receive, 12, 2);
@@ -1103,7 +1103,7 @@ public class SeanrsApp {
                                     // 包是从BGP发来的
                                     nrsPkt.setQueryType(SocketUtil.hexStringToBytes("06")[0]);
                                     nrsPkt.setNa(fromSwitchIP_hex);
-                                    na = bgp_Na_List.get(0); // TODO: 2021/8/24 这里我怎么知道哪个BGP给我发的请求？
+                                    na =  HexUtil.ip2HexString(bgp_Na_List.get(0), 32); // TODO: 2021/8/24 这里我怎么知道哪个BGP给我发的请求？
                                     idpPkt.setPayload(nrsPkt.pack());
                                     // TODO: 2021/11/22 -------------- 这里出现了NULLPointerException！------------------- 
                                     ipv6Pkt.setPayload(new Data(idpPkt.pack()));
