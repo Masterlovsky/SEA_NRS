@@ -1106,6 +1106,9 @@ public class SeanrsApp {
                                     na =  HexUtil.ip2HexString(bgp_Na_List.get(0), 32); // TODO: 2021/8/24 这里我怎么知道哪个BGP给我发的请求？
                                     idpPkt.setPayload(nrsPkt.pack());
                                     ipv6Pkt.setPayload(new Data(idpPkt.pack()));
+                                    MacAddress destinationMAC = ethPkt.getDestinationMAC();
+                                    ethPkt.setDestinationMACAddress(ethPkt.getSourceMACAddress());
+                                    ethPkt.setSourceMACAddress(destinationMAC);
                                 } else {
                                     log.error("packet source is unknown!");
                                 }
