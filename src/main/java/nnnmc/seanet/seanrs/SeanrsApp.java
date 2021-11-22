@@ -1055,7 +1055,6 @@ public class SeanrsApp {
 
                     // TODO: 2021/8/25 register response or deregister response
                     else if (queryType.equals("03") || queryType.equals("04")) {
-                        // TODO: 2021/11/8 测试有bug！！！！！！！！！！！！！！！！！！！！！！
                         byte[] payload = nrsPkt.getPayload();
                         if (payload != null && nrsPkt.getSource() == 0x01) {
                             // 收到BGP发来的注册/注销失败响应报文（格式2），反操作注册注销
@@ -1106,6 +1105,7 @@ public class SeanrsApp {
                                     nrsPkt.setNa(fromSwitchIP_hex);
                                     na = bgp_Na_List.get(0); // TODO: 2021/8/24 这里我怎么知道哪个BGP给我发的请求？
                                     idpPkt.setPayload(nrsPkt.pack());
+                                    // TODO: 2021/11/22 -------------- 这里出现了NULLPointerException！------------------- 
                                     ipv6Pkt.setPayload(new Data(idpPkt.pack()));
                                 } else {
                                     log.error("packet source is unknown!");

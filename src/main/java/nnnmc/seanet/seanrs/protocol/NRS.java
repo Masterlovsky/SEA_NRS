@@ -113,7 +113,9 @@ public class NRS implements Message {
             baos.write(bgpType);
             baos.write(source);
             baos.write(SocketUtil.hexStringToBytes(na));
-            baos.write(payload);
+            if (payload != null) {
+                baos.write(payload);
+            }
         } catch (Exception e) {
             logger.error(e.getMessage());
             e.printStackTrace();
