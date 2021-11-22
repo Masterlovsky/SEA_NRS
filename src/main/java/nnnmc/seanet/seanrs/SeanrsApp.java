@@ -1108,6 +1108,7 @@ public class SeanrsApp {
                                     // TODO: 2021/11/22 -------------- 这里出现了NULLPointerException！------------------- 
                                     ipv6Pkt.setPayload(new Data(idpPkt.pack()));
                                     log.warn("mzl_debug->payload: " + SocketUtil.bytesToHexString(ipv6Pkt.getPayload().serialize()));
+                                    log.warn("mzl_debug->na: " + na);
                                 } else {
                                     log.error("packet source is unknown!");
                                 }
@@ -1119,7 +1120,7 @@ public class SeanrsApp {
                         ipv6Pkt.setDestinationAddress(SocketUtil.hexStringToBytes(na));
                         ethPkt.setPayload(ipv6Pkt);
                         // TODO: 2021/8/30 是否下发流表项，下发策略？
-                        if (dstEid != null) {
+                        if (dstEid != null && receive[1] == 1) {
                             {
                                 FlowRule blockFlowRule = buildSetAddrAndGotoTableInstructionBlock(deviceId, 0, na, mobility_tableid_for_ipv6);
                                 flowRuleService.applyFlowRules(blockFlowRule);
