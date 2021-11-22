@@ -1084,10 +1084,10 @@ public class SeanrsApp {
                         // 发送给解析单点解析请求 TODO: 暂时未考虑tag解析
                         String resolveMsg = "71" + "000000" + Util.getRandomRequestID() + dstEid + Util.getTimestamp();
                         byte[] receive = SendAndRecv.throughUDP(HexUtil.ip2HexString(irsNa, 32), irsPort, SocketUtil.hexStringToBytes(resolveMsg));
-                        log.info(">>>> receive from irs: " + SocketUtil.bytesToHexString(receive) + " <<<<");
                         String na = HexUtil.zeros(32);
+                        int na_num = SocketUtil.byteArrayToInt(receive, 12, 2);
                         if (receive[1] == 1) {
-                            int na_num = SocketUtil.byteArrayToInt(receive, 12, 2);
+                            log.info(">>>> controller received resolve msg and obtain response from irs: success <<<<");
                             if (na_num > 0) {
                                 // 解析成功!，将返回的NA的第一个填入ipv6的dstIP字段 TODO：是否有选ip的策略？
                                 na = SocketUtil.bytesToHexString(Arrays.copyOfRange(receive, 34, 50));
@@ -1105,10 +1105,7 @@ public class SeanrsApp {
                                     nrsPkt.setNa(fromSwitchIP_hex);
                                     na =  HexUtil.ip2HexString(bgp_Na_List.get(0), 32); // TODO: 2021/8/24 这里我怎么知道哪个BGP给我发的请求？
                                     idpPkt.setPayload(nrsPkt.pack());
-                                    // TODO: 2021/11/22 -------------- 这里出现了NULLPointerException！------------------- 
                                     ipv6Pkt.setPayload(new Data(idpPkt.pack()));
-                                    log.warn("mzl_debug->payload: " + SocketUtil.bytesToHexString(ipv6Pkt.getPayload().serialize()));
-                                    log.warn("mzl_debug->na: " + na);
                                 } else {
                                     log.error("packet source is unknown!");
                                 }
@@ -1119,8 +1116,8 @@ public class SeanrsApp {
                         }
                         ipv6Pkt.setDestinationAddress(SocketUtil.hexStringToBytes(na));
                         ethPkt.setPayload(ipv6Pkt);
-                        // TODO: 2021/8/30 是否下发流表项，下发策略？
-                        if (dstEid != null && receive[1] == 1) {
+                        // TODO: 2021/8/30 是否下发流表项，下发策略？ 解析失败则不下表项？
+                        if (dstEid != null && na_num != 0) {
                             {
                                 FlowRule blockFlowRule = buildSetAddrAndGotoTableInstructionBlock(deviceId, 0, na, mobility_tableid_for_ipv6);
                                 flowRuleService.applyFlowRules(blockFlowRule);
