@@ -718,7 +718,7 @@ public class SeanrsApp {
                 .withSelector(trafficSelectorBuilder.build())
                 .withTreatment(trafficTreatmentBuilder.build())
                 .withPriority(FORWARD_PRIORITY)
-                .makePermanent() // TODO: 2021/8/20 这个地方后面要改成软超时，暂时先用永久表项
+                .makeTemporary(10)  // TODO: 2021/11/22 测试软超时是否生效 
                 .makeStored(false)
                 .build();
         flowEntrySentCache.add(flowRule);
