@@ -984,9 +984,9 @@ public class SeanrsApp {
                             String sendToIRSMsg = Util.msgFormat1ToIRSFormat(SocketUtil.bytesToHexString(payload));
                             byte[] receive = SendAndRecv.throughUDP(HexUtil.ip2HexString(irsNa, 32), irsPort, SocketUtil.hexStringToBytes(sendToIRSMsg));
                             if (receive != null) {
-                                log.debug(">>>> receive irs-{} response: {} <<<<", queryType.equals("01") ? "register" : "deregister", SocketUtil.bytesToHexString(receive));
                                 if (Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).startsWith("01", 10)) {
                                     // 注册或注销成功，改payload为格式2，转发给BGP, 控制器不返回注册注销响应报文
+                                    log.info(">>>> irs-{} response: {} <<<<", queryType.equals("01") ? "register" : "deregister", SocketUtil.bytesToHexString(receive));
                                     int total_len = 1 + 20 + 16 + 16 + 4 + bgpNum * 16;
                                     ByteArrayOutputStream baos = new ByteArrayOutputStream(total_len);
                                     try {
@@ -1045,8 +1045,8 @@ public class SeanrsApp {
                             byte[] sourceMACAddress = ethPkt.getSourceMACAddress();
                             ethPkt.setSourceMACAddress(ethPkt.getDestinationMACAddress());
                             ethPkt.setDestinationMACAddress(sourceMACAddress);
-                            log.warn("########## {} failed in controller, ready to send to client response packet(format1): " +
-                                    "{} ##########", isRegister, SocketUtil.bytesToHexString(ethPkt.serialize()));
+                            log.warn(">>>> {} failed in controller, ready to send to client response packet(format1): " +
+                                    "{} <<<<", isRegister, SocketUtil.bytesToHexString(ethPkt.serialize()));
                         }
                     }
 
@@ -1067,8 +1067,8 @@ public class SeanrsApp {
                                 ipv6Pkt.setDestinationAddress(Arrays.copyOfRange(payload, 22, 38));
                                 ipv6Pkt.setPayload(new Data(idpPkt.pack()));
                                 ethPkt.setPayload(ipv6Pkt);
-                                log.warn("########## register/deregister failed in bgp, ready to send to client response packet(format1): " +
-                                        "{} ##########", SocketUtil.bytesToHexString(ethPkt.serialize()));
+                                log.warn(">>>> {} failed in bgp, ready to send to client response pkt(format1): {} <<<<",
+                                        queryType.equals("03") ? "register" : "deregister", SocketUtil.bytesToHexString(ethPkt.serialize()));
                             } else {
                                 log.error("IRS don't response correctly, status is not '01'");
                             }
@@ -1084,7 +1084,7 @@ public class SeanrsApp {
                         String na = HexUtil.zeros(32);
                         int na_num = SocketUtil.byteArrayToInt(receive, 12, 2);
                         if (receive[1] == 1) {
-                            log.debug(">>>> receive irs-resolve response: {} , status: success!, NA number: {} <<<<", SocketUtil.bytesToHexString(receive), na_num);
+                            log.info(">>>> irs-resolve response: {} , NA number: {} <<<<", SocketUtil.bytesToHexString(receive), na_num);
                             if (na_num > 0) {
                                 // 解析成功!，将返回的NA的第一个填入ipv6的dstIP字段 TODO：是否有选ip的策略？
                                 na = SocketUtil.bytesToHexString(Arrays.copyOfRange(receive, 34, 50));
