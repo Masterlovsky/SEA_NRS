@@ -207,6 +207,10 @@ public class SocketUtil {
         return intValue;
     }
 
+    public static short byteArrayToShort(byte[] b, int byteOffset) {
+        return (short) (((b[byteOffset] << 8) | b[byteOffset + 1] & 0xff));
+    }
+
     public static int bytes2Int(byte[] b, int byteOffset) {
         ByteBuffer byteBuffer = ByteBuffer.allocate(Integer.SIZE / Byte.SIZE);
         byteBuffer.put(b, byteOffset, 4); // 占4个字节
@@ -232,6 +236,7 @@ public class SocketUtil {
     }
 
     public static void main(String[] args) {
-        System.out.println(bytesToHexString(hexStringToBytes("10.37655")));
+        int i = byteArrayToShort(hexStringToBytes("0005"), 0);
+        System.out.println(i);
     }
 }

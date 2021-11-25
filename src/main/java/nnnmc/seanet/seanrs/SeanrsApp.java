@@ -1083,7 +1083,7 @@ public class SeanrsApp {
                         String resolveMsg = "71" + "000000" + Util.getRandomRequestID() + dstEid + Util.getTimestamp();
                         byte[] receive = SendAndRecv.throughUDP(HexUtil.ip2HexString(irsNa, 32), irsPort, SocketUtil.hexStringToBytes(resolveMsg));
                         String na = HexUtil.zeros(32);
-                        int na_num = SocketUtil.byteArrayToInt(receive, 12, 2);
+                        int na_num = SocketUtil.byteArrayToShort(receive, 12);
                         if (receive[1] == 1) {
                             log.info(">>>> irs-resolve response: {} , NA number: {} <<<<",
                                     Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).replaceAll("(00)+$", ""), na_num);
