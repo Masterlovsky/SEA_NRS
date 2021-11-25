@@ -883,14 +883,12 @@ public class SeanrsApp {
             DeviceId deviceId = event.subject();
             //noinspection SwitchStatementWithTooFewBranches
             switch (event.type()) {
-                case MASTER_CHANGED:
-                {
+                case MASTER_CHANGED: {
                     NodeId master = mastershipService.getMasterFor(deviceId);
-                    if(deviceId.toString().startsWith("pof")) {
-                        if(Objects.equals(local, master) && (tableSentCache.size(deviceId)==0)) {
+                    if (deviceId.toString().startsWith("pof")) {
+                        if (Objects.equals(local, master) && (tableSentCache.size(deviceId) == 0)) {
                             buildNRSTables(deviceId);
-                        }
-                        else{
+                        } else {
                             executor.execute(() -> {
                                 removeOldFlowRules(deviceId);
                                 instructionBlockSentCache.remove(deviceId);
@@ -947,11 +945,10 @@ public class SeanrsApp {
             InboundPacket pkt = context.inPacket();
             ConnectPoint ingressPort = pkt.receivedFrom();
             Interface anInterface = interfaceService.getInterfacesByPort(ingressPort).stream().findFirst().orElse(null);
-            log.info("########### anInterface: " + anInterface + " #############");
             IpAddress ipAddress = Objects.requireNonNull(anInterface).ipAddressesList().get(1).ipAddress();
             String fromSwitchIP = ipAddress.toInetAddress().getHostAddress();
             String fromSwitchIP_hex = HexUtil.ip2HexString(fromSwitchIP, 32);
-            log.info("########### fromSwitchIP_hex: " + fromSwitchIP_hex + " ###########");
+            log.info(">>>> receive pkt from switch, ip: " + fromSwitchIP + ", port: " + ingressPort.port().toLong() + " <<<<");
             DeviceId deviceId = ingressPort.deviceId();
             Ethernet ethPkt = pkt.parsed();
             // TODO: 2021/8/22 Vlan 和 Qinq 先不处理
@@ -987,7 +984,7 @@ public class SeanrsApp {
                             String sendToIRSMsg = Util.msgFormat1ToIRSFormat(SocketUtil.bytesToHexString(payload));
                             byte[] receive = SendAndRecv.throughUDP(HexUtil.ip2HexString(irsNa, 32), irsPort, SocketUtil.hexStringToBytes(sendToIRSMsg));
                             if (receive != null) {
-                                log.debug("########## receive irs register/deregister response: {} ##########", SocketUtil.bytesToHexString(receive));
+                                log.debug(">>>> receive irs-{} response: {} <<<<", queryType.equals("01") ? "register" : "deregister", SocketUtil.bytesToHexString(receive));
                                 if (Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).startsWith("01", 10)) {
                                     // 注册或注销成功，改payload为格式2，转发给BGP, 控制器不返回注册注销响应报文
                                     int total_len = 1 + 20 + 16 + 16 + 4 + bgpNum * 16;
@@ -1013,7 +1010,7 @@ public class SeanrsApp {
                                     String BGP_NA = bgp_Na_List.get(0); // TODO: 2021/8/23 暂时从BGP列表中选取选取第一个发送
                                     ipv6Pkt.setDestinationAddress(SocketUtil.hexStringToBytes(HexUtil.ip2HexString(BGP_NA, 32)));
                                     ethPkt.setPayload(ipv6Pkt);
-                                    log.info("########## register/deregister success! ready to send packet: {} to BGP: {} #########",
+                                    log.info(">>>> {} success! ready to send packet: {} to BGP: {} <<<<", queryType.equals("01") ? "register" : "deregister",
                                             SocketUtil.bytesToHexString(ethPkt.serialize()), BGP_NA);
                                 } else {
                                     flag = false;
@@ -1087,7 +1084,7 @@ public class SeanrsApp {
                         String na = HexUtil.zeros(32);
                         int na_num = SocketUtil.byteArrayToInt(receive, 12, 2);
                         if (receive[1] == 1) {
-                            log.info(">>>> controller received resolve msg and obtain response from irs: success <<<<");
+                            log.debug(">>>> receive irs-resolve response: {} , status: success!, NA number: {} <<<<", SocketUtil.bytesToHexString(receive), na_num);
                             if (na_num > 0) {
                                 // 解析成功!，将返回的NA的第一个填入ipv6的dstIP字段 TODO：是否有选ip的策略？
                                 na = SocketUtil.bytesToHexString(Arrays.copyOfRange(receive, 34, 50));
@@ -1104,7 +1101,7 @@ public class SeanrsApp {
                                     nrsPkt.setQueryType(SocketUtil.hexStringToBytes("06")[0]);
                                     nrsPkt.setSource(SocketUtil.hexStringToBytes("00")[0]);
                                     nrsPkt.setNa(fromSwitchIP_hex);
-                                    na =  HexUtil.ip2HexString(bgp_Na_List.get(0), 32); // TODO: 2021/8/24 这里我怎么知道哪个BGP给我发的请求？
+                                    na = HexUtil.ip2HexString(bgp_Na_List.get(0), 32); // TODO: 2021/8/24 这里我怎么知道哪个BGP给我发的请求？
                                     idpPkt.setPayload(nrsPkt.pack());
                                     ipv6Pkt.setPayload(new Data(idpPkt.pack()));
                                     MacAddress destinationMAC = ethPkt.getDestinationMAC();
