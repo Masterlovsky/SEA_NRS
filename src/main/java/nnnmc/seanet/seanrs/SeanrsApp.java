@@ -986,7 +986,8 @@ public class SeanrsApp {
                             if (receive != null) {
                                 if (Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).startsWith("01", 10)) {
                                     // 注册或注销成功，改payload为格式2，转发给BGP, 控制器不返回注册注销响应报文
-                                    log.info(">>>> irs-{} response: {} <<<<", queryType.equals("01") ? "register" : "deregister", SocketUtil.bytesToHexString(receive));
+                                    log.info(">>>> irs-{} response: {} <<<<", queryType.equals("01") ? "register" : "deregister",
+                                            Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).replaceAll("(00)+$", ""));
                                     int total_len = 1 + 20 + 16 + 16 + 4 + bgpNum * 16;
                                     ByteArrayOutputStream baos = new ByteArrayOutputStream(total_len);
                                     try {
@@ -1084,7 +1085,8 @@ public class SeanrsApp {
                         String na = HexUtil.zeros(32);
                         int na_num = SocketUtil.byteArrayToInt(receive, 12, 2);
                         if (receive[1] == 1) {
-                            log.info(">>>> irs-resolve response: {} , NA number: {} <<<<", SocketUtil.bytesToHexString(receive), na_num);
+                            log.info(">>>> irs-resolve response: {} , NA number: {} <<<<",
+                                    Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).replaceAll("(00)+$", ""), na_num);
                             if (na_num > 0) {
                                 // 解析成功!，将返回的NA的第一个填入ipv6的dstIP字段 TODO：是否有选ip的策略？
                                 na = SocketUtil.bytesToHexString(Arrays.copyOfRange(receive, 34, 50));
