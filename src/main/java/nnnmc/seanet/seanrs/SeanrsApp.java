@@ -1065,9 +1065,13 @@ public class SeanrsApp {
                                 nrsPkt.setPayload(payload_format1);
                                 nrsPkt.setSource((byte) 0x00);
                                 idpPkt.setPayload(nrsPkt.pack());
-                                ipv6Pkt.setDestinationAddress(Arrays.copyOfRange(payload, 22, 38));
+                                ipv6Pkt.setDestinationAddress(Arrays.copyOfRange(payload, 22, 38)); // 目的地址修改成用户的NA
                                 ipv6Pkt.setPayload(new Data(idpPkt.pack()));
                                 ethPkt.setPayload(ipv6Pkt);
+                                // TODO: 2021/11/30 这个地方应该把MAC填成合适的地址而不是交换一下，暂时先这样 
+                                MacAddress destinationMAC = ethPkt.getDestinationMAC(); 
+                                ethPkt.setDestinationMACAddress(ethPkt.getSourceMACAddress());
+                                ethPkt.setSourceMACAddress(destinationMAC);
                                 log.warn(">>>> {} failed in bgp, ready to send to client response pkt(format1): {} <<<<",
                                         queryType.equals("03") ? "register" : "deregister", SocketUtil.bytesToHexString(ethPkt.serialize()));
                             } else {
