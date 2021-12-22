@@ -198,7 +198,7 @@ public class SeanrsApp {
                 NodeId master = mastershipService.getMasterFor(deviceId);
                 if (Objects.equals(local, master)) {
                     buildNRSTables(deviceId);
-                    log.info("activate: {} add FlowTable for NRS App. allNRSTablesStored(deviceId)={}, " + "instructionBlockSentCache.size(deviceId)={}",
+                    log.debug("activate: {} add FlowTable for NRS App. allNRSTablesStored(deviceId)={}, " + "instructionBlockSentCache.size(deviceId)={}",
                             deviceId, allNRSTablesStored(deviceId), instructionBlockSentCache.size(deviceId));
                 }
             }
@@ -948,7 +948,7 @@ public class SeanrsApp {
             IpAddress ipAddress = Objects.requireNonNull(anInterface).ipAddressesList().get(1).ipAddress();
             String fromSwitchIP = ipAddress.toInetAddress().getHostAddress();
             String fromSwitchIP_hex = HexUtil.ip2HexString(fromSwitchIP, 32);
-            log.info(">>>> receive pkt from switch, ip: " + fromSwitchIP + ", port: " + ingressPort.port().toLong() + " <<<<");
+            log.debug(">>>> receive pkt from switch, ip: " + fromSwitchIP + ", port: " + ingressPort.port().toLong() + " <<<<");
             DeviceId deviceId = ingressPort.deviceId();
             Ethernet ethPkt = pkt.parsed();
             // TODO: 2021/8/22 Vlan 和 Qinq 先不处理
@@ -963,7 +963,7 @@ public class SeanrsApp {
             int nextHdr = HexUtil.byteToUnsignedInt(ipv6Pkt.getNextHeader());
             if (nextHdr == 0x11) {
                 // TODO: 2021/7/27 UDP 实际上并不会执行
-                log.info("receive UDP packet, content: {}", SocketUtil.bytesToHexString(ipv6Pkt.serialize()));
+                log.debug("receive UDP packet, content: {}", SocketUtil.bytesToHexString(ipv6Pkt.serialize()));
             } else if (nextHdr == 0x99) {
                 // TODO: 2021/7/27 IDP 暂定使用扩展包头的方式
                 IDP idpPkt = new IDP().unpack(ipv6Pkt.getPayload().serialize());
@@ -986,7 +986,7 @@ public class SeanrsApp {
                             if (receive != null) {
                                 if (Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).startsWith("01", 10)) {
                                     // 注册或注销成功，改payload为格式2，转发给BGP, 控制器不返回注册注销响应报文
-                                    log.info(">>>> irs-{} response: {} <<<<", queryType.equals("01") ? "register" : "deregister",
+                                    log.debug(">>>> irs-{} response: {} <<<<", queryType.equals("01") ? "register" : "deregister",
                                             Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).replaceAll("(00)+$", ""));
                                     int total_len = 1 + 20 + 16 + 16 + 4 + bgpNum * 16;
                                     ByteArrayOutputStream baos = new ByteArrayOutputStream(total_len);
@@ -1011,7 +1011,7 @@ public class SeanrsApp {
                                     String BGP_NA = bgp_Na_List.get(0); // TODO: 2021/8/23 暂时从BGP列表中选取选取第一个发送
                                     ipv6Pkt.setDestinationAddress(SocketUtil.hexStringToBytes(HexUtil.ip2HexString(BGP_NA, 32)));
                                     ethPkt.setPayload(ipv6Pkt);
-                                    log.info(">>>> {} success! ready to send packet: {} to BGP: {} <<<<", queryType.equals("01") ? "register" : "deregister",
+                                    log.debug(">>>> {} success! ready to send packet: {} to BGP: {} <<<<", queryType.equals("01") ? "register" : "deregister",
                                             SocketUtil.bytesToHexString(ethPkt.serialize()), BGP_NA);
                                 } else {
                                     flag = false;
@@ -1089,7 +1089,7 @@ public class SeanrsApp {
                         String na = HexUtil.zeros(32);
                         int na_num = SocketUtil.byteArrayToShort(receive, 12);
                         if (receive[1] == 1) {
-                            log.info(">>>> irs-resolve response: {} , NA number: {} <<<<",
+                            log.debug(">>>> irs-resolve response: {} , NA number: {} <<<<",
                                     Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).replaceAll("(00)+$", ""), na_num);
                             if (na_num > 0) {
                                 // 解析成功!，将返回的NA的第一个填入ipv6的dstIP字段 TODO：是否有选ip的策略？
@@ -1142,14 +1142,14 @@ public class SeanrsApp {
                             }
                             String finalNa = na;
                             executor.execute(() -> {
-                                if (!allInstructionBlocksInstalled(deviceId)) {
-                                    try {
-                                        Thread.sleep(1000);
-                                        log.warn("allInstructionBlocksInstalled={}, sleep 1s", allInstructionBlocksInstalled(deviceId));
-                                    } catch (InterruptedException e) {
-                                        e.printStackTrace();
-                                    }
-                                }
+//                                if (!allInstructionBlocksInstalled(deviceId)) {
+//                                    try {
+//                                        Thread.sleep(1000);
+//                                        log.warn("allInstructionBlocksInstalled={}, sleep 1s", allInstructionBlocksInstalled(deviceId));
+//                                    } catch (InterruptedException e) {
+//                                        e.printStackTrace();
+//                                    }
+//                                }
                                 addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, finalNa, seanrs_tableid_ipv6, mobility_tableid_for_ipv6);
                                 addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, finalNa, seanrs_tableid_vlan, MobilityTableID_for_Vlan);
                                 addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, finalNa, seanrs_tableid_qinq, MobilityTableID_for_Qinq);
