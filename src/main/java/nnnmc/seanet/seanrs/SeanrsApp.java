@@ -939,6 +939,20 @@ public class SeanrsApp {
                 return;
             }
             nrsPacketInProcess(context);
+//            onlyPktOut(context);
+        }
+
+        /**
+         * 用于测试，直接把收上来的包从收包端口发回去
+         * @param context 数据包
+         */
+        private void onlyPktOut(PacketContext context) {
+            InboundPacket pkt = context.inPacket();
+            ConnectPoint ingressPort = pkt.receivedFrom();
+            DeviceId deviceId = ingressPort.deviceId();
+            TrafficTreatment.Builder builder = DefaultTrafficTreatment.builder();
+            builder.setOutput(ingressPort.port());
+            packetService.emit(new DefaultOutboundPacket(deviceId, builder.build(), pkt.unparsed()));
         }
 
         private void nrsPacketInProcess(PacketContext context) {
@@ -948,7 +962,7 @@ public class SeanrsApp {
             IpAddress ipAddress = Objects.requireNonNull(anInterface).ipAddressesList().get(1).ipAddress();
             String fromSwitchIP = ipAddress.toInetAddress().getHostAddress();
             String fromSwitchIP_hex = HexUtil.ip2HexString(fromSwitchIP, 32);
-            log.debug(">>>> receive pkt from switch, ip: " + fromSwitchIP + ", port: " + ingressPort.port().toLong() + " <<<<");
+//            log.info(">>>> receive pkt from switch, ip: " + fromSwitchIP + ", port: " + ingressPort.port().toLong() + " <<<<");
             DeviceId deviceId = ingressPort.deviceId();
             Ethernet ethPkt = pkt.parsed();
             // TODO: 2021/8/22 Vlan 和 Qinq 先不处理
@@ -986,8 +1000,8 @@ public class SeanrsApp {
                             if (receive != null) {
                                 if (Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).startsWith("01", 10)) {
                                     // 注册或注销成功，改payload为格式2，转发给BGP, 控制器不返回注册注销响应报文
-                                    log.debug(">>>> irs-{} response: {} <<<<", queryType.equals("01") ? "register" : "deregister",
-                                            Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).replaceAll("(00)+$", ""));
+//                                    log.info(">>>> irs-{} response: {} <<<<", queryType.equals("01") ? "register" : "deregister",
+//                                            Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).replaceAll("(00)+$", ""));
                                     int total_len = 1 + 20 + 16 + 16 + 4 + bgpNum * 16;
                                     ByteArrayOutputStream baos = new ByteArrayOutputStream(total_len);
                                     try {
@@ -1011,8 +1025,8 @@ public class SeanrsApp {
                                     String BGP_NA = bgp_Na_List.get(0); // TODO: 2021/8/23 暂时从BGP列表中选取选取第一个发送
                                     ipv6Pkt.setDestinationAddress(SocketUtil.hexStringToBytes(HexUtil.ip2HexString(BGP_NA, 32)));
                                     ethPkt.setPayload(ipv6Pkt);
-                                    log.debug(">>>> {} success! ready to send packet: {} to BGP: {} <<<<", queryType.equals("01") ? "register" : "deregister",
-                                            SocketUtil.bytesToHexString(ethPkt.serialize()), BGP_NA);
+//                                    log.info(">>>> {} success! ready to send packet: {} to BGP: {} <<<<", queryType.equals("01") ? "register" : "deregister",
+//                                            SocketUtil.bytesToHexString(ethPkt.serialize()), BGP_NA);
                                 } else {
                                     flag = false;
                                     log.error("Receive IRS register/deregister response status is failed");
@@ -1069,7 +1083,7 @@ public class SeanrsApp {
                                 ipv6Pkt.setPayload(new Data(idpPkt.pack()));
                                 ethPkt.setPayload(ipv6Pkt);
                                 // TODO: 2021/11/30 这个地方应该把MAC填成合适的地址而不是交换一下，暂时先这样 
-                                MacAddress destinationMAC = ethPkt.getDestinationMAC(); 
+                                MacAddress destinationMAC = ethPkt.getDestinationMAC();
                                 ethPkt.setDestinationMACAddress(ethPkt.getSourceMACAddress());
                                 ethPkt.setSourceMACAddress(destinationMAC);
                                 log.warn(">>>> {} failed in bgp, ready to send to client response pkt(format1): {} <<<<",
@@ -1089,8 +1103,8 @@ public class SeanrsApp {
                         String na = HexUtil.zeros(32);
                         int na_num = SocketUtil.byteArrayToShort(receive, 12);
                         if (receive[1] == 1) {
-                            log.debug(">>>> irs-resolve response: {} , NA number: {} <<<<",
-                                    Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).replaceAll("(00)+$", ""), na_num);
+//                            log.info(">>>> irs-resolve response: {} , NA number: {} <<<<",
+//                                    Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).replaceAll("(00)+$", ""), na_num);
                             if (na_num > 0) {
                                 // 解析成功!，将返回的NA的第一个填入ipv6的dstIP字段 TODO：是否有选ip的策略？
                                 na = SocketUtil.bytesToHexString(Arrays.copyOfRange(receive, 34, 50));

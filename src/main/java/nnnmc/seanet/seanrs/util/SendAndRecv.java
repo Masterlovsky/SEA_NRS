@@ -97,7 +97,7 @@ public class SendAndRecv extends Thread {
             socket.setSoTimeout(timeout);
             DatagramPacket request;
             request = new DatagramPacket(req, req.length, InetAddress.getByName(HexUtil.hexString2Ip(na)), port);
-            logger.debug("send: " + SocketUtil.bytesToHexString(req) + " to " + na + " : " + port);
+//            logger.debug("send: " + SocketUtil.bytesToHexString(req) + " to " + na + " : " + port);
             socket.send(request);
             socket.receive(packet);
             socket.close();
