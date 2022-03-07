@@ -102,8 +102,8 @@ public class SeanrsApp {
     protected int seanrs_tableid_vlan = NRS_TABLE_BASE_ID_DEFAULT + 10;
     protected int seanrs_tableid_qinq = NRS_TABLE_BASE_ID_DEFAULT + 20;
     protected int mobility_tableid_for_ipv6 = MOBILITY_TABLE_BASE_ID_DEFAULT;
-    protected int MobilityTableID_for_Vlan = MOBILITY_TABLE_BASE_ID_DEFAULT + 10;
-    protected int MobilityTableID_for_Qinq = MOBILITY_TABLE_BASE_ID_DEFAULT + 20;
+    protected int mobility_tableid_for_vlan = MOBILITY_TABLE_BASE_ID_DEFAULT + 10;
+    protected int mobility_tableid_for_qinq = MOBILITY_TABLE_BASE_ID_DEFAULT + 20;
 
     private static final int LOCAL_PKTIN_PRIORITY = 5000;
     private static final int FORWARD_PRIORITY = 4000;
@@ -151,8 +151,8 @@ public class SeanrsApp {
         seanrs_tableid_vlan = seanrs_tableid_ipv6 + 10;
         seanrs_tableid_qinq = seanrs_tableid_ipv6 + 20;
         mobility_tableid_for_ipv6 = Tools.getIntegerProperty(properties, MOBILITY_TABLEID_FOR_IPV6, MOBILITY_TABLE_BASE_ID_DEFAULT);
-        MobilityTableID_for_Vlan = mobility_tableid_for_ipv6 + 10;
-        MobilityTableID_for_Qinq = mobility_tableid_for_ipv6 + 20;
+        mobility_tableid_for_vlan = mobility_tableid_for_ipv6 + 10;
+        mobility_tableid_for_qinq = mobility_tableid_for_ipv6 + 20;
     }
 
     @Modified
@@ -431,12 +431,12 @@ public class SeanrsApp {
             instructionBlockSentCache.add(blockFlowRule);
         }
         {
-            FlowRule blockFlowRule = buildGotoTableInstructionBlock(deviceId, MobilityTableID_for_Vlan);
+            FlowRule blockFlowRule = buildGotoTableInstructionBlock(deviceId, mobility_tableid_for_vlan);
             flowRuleService.applyFlowRules(blockFlowRule);
             instructionBlockSentCache.add(blockFlowRule);
         }
         {
-            FlowRule blockFlowRule = buildGotoTableInstructionBlock(deviceId, MobilityTableID_for_Qinq);
+            FlowRule blockFlowRule = buildGotoTableInstructionBlock(deviceId, mobility_tableid_for_qinq);
             flowRuleService.applyFlowRules(blockFlowRule);
             instructionBlockSentCache.add(blockFlowRule);
         }
@@ -588,8 +588,8 @@ public class SeanrsApp {
             addResolveCachePacketInFlowEntry(deviceId, seanrs_tableid_qinq, HexUtil.duplicates('0', 32));
 //          add default GoToTable entry for nrs_table
             addDefaultGoToTableFlowEntry(deviceId, seanrs_tableid_ipv6, mobility_tableid_for_ipv6);
-            addDefaultGoToTableFlowEntry(deviceId, seanrs_tableid_vlan, MobilityTableID_for_Vlan);
-            addDefaultGoToTableFlowEntry(deviceId, seanrs_tableid_qinq, MobilityTableID_for_Qinq);
+            addDefaultGoToTableFlowEntry(deviceId, seanrs_tableid_vlan, mobility_tableid_for_vlan);
+            addDefaultGoToTableFlowEntry(deviceId, seanrs_tableid_qinq, mobility_tableid_for_qinq);
         } catch (Exception e) {
             log.error(e.getMessage(), e);
         }
@@ -1320,12 +1320,12 @@ public class SeanrsApp {
                                 instructionBlockSentCache.add(blockFlowRule);
                             }
                             {
-                                FlowRule blockFlowRule = buildSetAddrAndGotoTableInstructionBlock(deviceId, 4, na, MobilityTableID_for_Vlan);
+                                FlowRule blockFlowRule = buildSetAddrAndGotoTableInstructionBlock(deviceId, 4, na, mobility_tableid_for_vlan);
                                 flowRuleService.applyFlowRules(blockFlowRule);
                                 instructionBlockSentCache.add(blockFlowRule);
                             }
                             {
-                                FlowRule blockFlowRule = buildSetAddrAndGotoTableInstructionBlock(deviceId, 8, na, MobilityTableID_for_Qinq);
+                                FlowRule blockFlowRule = buildSetAddrAndGotoTableInstructionBlock(deviceId, 8, na, mobility_tableid_for_qinq);
                                 flowRuleService.applyFlowRules(blockFlowRule);
                                 instructionBlockSentCache.add(blockFlowRule);
                             }
@@ -1340,15 +1340,18 @@ public class SeanrsApp {
                                     }
                                 }
                                 addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, finalNa, seanrs_tableid_ipv6, mobility_tableid_for_ipv6);
-                                addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, finalNa, seanrs_tableid_vlan, MobilityTableID_for_Vlan);
-                                addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, finalNa, seanrs_tableid_qinq, MobilityTableID_for_Qinq);
+                                addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, finalNa, seanrs_tableid_vlan, mobility_tableid_for_vlan);
+                                addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, finalNa, seanrs_tableid_qinq, mobility_tableid_for_qinq);
                             });
 
                         }
                     }
 //                    FlowModTreatment flowModTreatment = new FlowModTreatment(buildGotoTableInstructionBlock(deviceId, mobility_tableid_for_ipv6).id().value());
+//                  send packet out, bind(copyToAE and GoToTable)
+                    OFInstruction ofInstructionCopyToAE = new OFInstructionOutput(OutPutType.OUTAEM, 0, 0xffff);
                     OFInstruction ofInstructionGotoTable = new OFInstructionGotoTable(mobility_tableid_for_ipv6);
                     InstructionTreatment treatment = new InstructionTreatment();
+                    treatment.addInstruction(ofInstructionCopyToAE);
                     treatment.addInstruction(ofInstructionGotoTable);
                     TrafficTreatment.Builder builder = DefaultTrafficTreatment.builder();
                     builder.extension(treatment, deviceId);
