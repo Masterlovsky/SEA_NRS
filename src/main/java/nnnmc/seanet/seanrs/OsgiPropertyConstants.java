@@ -25,8 +25,8 @@ public final class OsgiPropertyConstants {
     public static final String SEANRS_TABLEID_IPV6 = "seanrs_tableid_ipv6";
     public static final int NRS_TABLE_BASE_ID_DEFAULT = 1;
 
-    public static final String MOBILITY_TABLEID_FOR_IPV6 = "mobility_tableid_for_ipv6";
-    public static final int MOBILITY_TABLE_BASE_ID_DEFAULT = 2;
+    public static final String SEANRS_NEXT_TABLEID = "seanrs_next_tableid";
+    public static final int SEANRS_NEXT_TABLEID_DEFAULT = 2;
 
     public static final String TABLESIZE = "tableSize";
     public static final int SIZE_DEFAULT = 1024 * 64 - 1;

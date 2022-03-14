@@ -58,7 +58,7 @@ import static org.onlab.util.Tools.groupedThreads;
         immediate = true,
         property = {
                 SEANRS_TABLEID_IPV6 + ":Integer=" + NRS_TABLE_BASE_ID_DEFAULT,
-                MOBILITY_TABLEID_FOR_IPV6 + ":Integer=" + MOBILITY_TABLE_BASE_ID_DEFAULT,
+                SEANRS_NEXT_TABLEID + ":Integer=" + SEANRS_NEXT_TABLEID_DEFAULT,
                 TABLESIZE + ":Integer=" + SIZE_DEFAULT,
                 IRS_PORT_NAME + ":Integer=" + IRS_PORT_DEFAULT,
                 BGP_NUM_NAME + ":Integer=" + BGP_NUM_DEFAULT,
@@ -101,9 +101,9 @@ public class SeanrsApp {
     protected int seanrs_tableid_ipv6 = NRS_TABLE_BASE_ID_DEFAULT;
     protected int seanrs_tableid_vlan = NRS_TABLE_BASE_ID_DEFAULT + 10;
     protected int seanrs_tableid_qinq = NRS_TABLE_BASE_ID_DEFAULT + 20;
-    protected int mobility_tableid_for_ipv6 = MOBILITY_TABLE_BASE_ID_DEFAULT;
-    protected int mobility_tableid_for_vlan = MOBILITY_TABLE_BASE_ID_DEFAULT + 10;
-    protected int mobility_tableid_for_qinq = MOBILITY_TABLE_BASE_ID_DEFAULT + 20;
+    protected int seanrs_next_tableid = SEANRS_NEXT_TABLEID_DEFAULT;
+    protected int seanrs_next_tableid_for_vlan = SEANRS_NEXT_TABLEID_DEFAULT + 10;
+    protected int seanrs_next_tableid_for_qinq = SEANRS_NEXT_TABLEID_DEFAULT + 20;
 
     private static final int LOCAL_PKTIN_PRIORITY = 5000;
     private static final int FORWARD_PRIORITY = 4000;
@@ -150,9 +150,9 @@ public class SeanrsApp {
         seanrs_tableid_ipv6 = Tools.getIntegerProperty(properties, SEANRS_TABLEID_IPV6, NRS_TABLE_BASE_ID_DEFAULT);
         seanrs_tableid_vlan = seanrs_tableid_ipv6 + 10;
         seanrs_tableid_qinq = seanrs_tableid_ipv6 + 20;
-        mobility_tableid_for_ipv6 = Tools.getIntegerProperty(properties, MOBILITY_TABLEID_FOR_IPV6, MOBILITY_TABLE_BASE_ID_DEFAULT);
-        mobility_tableid_for_vlan = mobility_tableid_for_ipv6 + 10;
-        mobility_tableid_for_qinq = mobility_tableid_for_ipv6 + 20;
+        seanrs_next_tableid = Tools.getIntegerProperty(properties, SEANRS_NEXT_TABLEID, SEANRS_NEXT_TABLEID_DEFAULT);
+        seanrs_next_tableid_for_vlan = seanrs_next_tableid + 10;
+        seanrs_next_tableid_for_qinq = seanrs_next_tableid + 20;
     }
 
     @Modified
@@ -259,43 +259,34 @@ public class SeanrsApp {
 
         log.info("========== build NRS Table begin for device {} ==========", deviceId);
         {
-            FlowRule table1 = createNRSTable(deviceId, seanrs_tableid_ipv6, 0);//ipv6
+            FlowRule table1 = createNRSTable(deviceId, seanrs_tableid_ipv6, seanrs_next_tableid); //ipv6
             flowRuleService.applyFlowRules(table1);
             tableSentCache.add(table1);
-        }
-        {
-            FlowRule table11 = createNRSTable(deviceId, seanrs_tableid_vlan, 4);//vlan
-            flowRuleService.applyFlowRules(table11);
-            tableSentCache.add(table11);
-        }
-        {
-            FlowRule table21 = createNRSTable(deviceId, seanrs_tableid_qinq, 8);//qinq
-            flowRuleService.applyFlowRules(table21);
-            tableSentCache.add(table21);
         }
 
         log.info("========== build Table 2 for device {} ==========", deviceId);
         {
-            FlowRule table2 = createFibTable(deviceId, FIB_TABLE, 0); //table0
+            FlowRule table2 = createFibTable(deviceId, FIB_TABLE); //table0
             flowRuleService.applyFlowRules(table2);
             tableSentCache.add(table2);
         }
     }
 
-    private FlowRule createNRSTable(DeviceId deviceId, int tableId, int offset) {
+    private FlowRule createNRSTable(DeviceId deviceId, int tableId, int gotoTableID) {
         log.debug("---------- createNRSTable{}, in {} begin ----------", tableId, deviceId);
 
         OFMatch20Selector selector = new OFMatch20Selector();
-        selector.addOFMatch20(FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 24 * 8, 16 * 8); // DEST_IPV6_ADDR
-        selector.addOFMatch20(FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 40 * 8, 8); // IDP_NextHeader
-        selector.addOFMatch20(FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 64 * 8, 16 * 8); // DEST_EID (1-16Byte)
-        selector.addOFMatch20(FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 80 * 8, 4 * 8); // DEST_EID (16-20Byte)
+        selector.addOFMatch20(FieldId.PACKET, 24 * 8, 16 * 8); // DEST_IPV6_ADDR
+        selector.addOFMatch20(FieldId.PACKET, 40 * 8, 8); // IDP_NextHeader
+        selector.addOFMatch20(FieldId.PACKET, 64 * 8, 16 * 8); // DEST_EID (1-16Byte)
+        selector.addOFMatch20(FieldId.PACKET, 80 * 8, 4 * 8); // DEST_EID (16-20Byte)
 
         TrafficSelector.Builder trafficSelectorBuilder = DefaultTrafficSelector.builder();
         trafficSelectorBuilder.extension(selector, deviceId);
 
         TrafficTreatment.Builder trafficTreatmentBuilder = DefaultTrafficTreatment.builder();
-        trafficTreatmentBuilder.extension(new TableModTreatment(OFTableType.OF_EM_TABLE, tableSize, "NRSTable"), deviceId);
+        trafficTreatmentBuilder.extension(new TableModTreatment(OFTableType.OF_EM_TABLE, tableSize, "NRSTable",
+                buildSuperDefaultInstructionBlock(deviceId, gotoTableID).id().value()), deviceId);
         PofFlowRuleBuilder builder = new PofFlowRuleBuilder();
         FlowRule flowRule = builder
                 .fromApp(appId)
@@ -330,11 +321,11 @@ public class SeanrsApp {
         return flowRule;
     }
 
-    private FlowRule createFibTable(DeviceId deviceId, int tableId, int offset) {
+    private FlowRule createFibTable(DeviceId deviceId, int tableId) {
         log.debug("-- createFibTable{}, in {} begin --", tableId, deviceId);
 
         OFMatch20Selector selector = new OFMatch20Selector();
-        selector.addOFMatch20(FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 24 * 8, 16 * 8); // DEST_IPV6_ADDR
+        selector.addOFMatch20(FieldId.PACKET, 24 * 8, 16 * 8); // DEST_IPV6_ADDR
 
         TrafficSelector.Builder trafficSelectorBuilder = DefaultTrafficSelector.builder();
         trafficSelectorBuilder.extension(selector, deviceId);
@@ -399,17 +390,27 @@ public class SeanrsApp {
             instructionBlockSentCache.add(blockFlowRule);
         }
         {
-            FlowRule blockFlowRule = buildSuperDefaultInstructionBlock(deviceId, 0, mobility_tableid_for_ipv6);
+            FlowRule blockFlowRule = buildSetOffsetAndGotoTableInstructionBlock(deviceId, seanrs_tableid_ipv6);
             flowRuleService.applyFlowRules(blockFlowRule);
             instructionBlockSentCache.add(blockFlowRule);
         }
         {
-            FlowRule blockFlowRule = buildSuperDefaultInstructionBlock(deviceId, 4, mobility_tableid_for_vlan);
+            FlowRule blockFlowRule = buildDropInstructionBlock(deviceId);
             flowRuleService.applyFlowRules(blockFlowRule);
             instructionBlockSentCache.add(blockFlowRule);
         }
         {
-            FlowRule blockFlowRule = buildSuperDefaultInstructionBlock(deviceId, 8, mobility_tableid_for_qinq);
+            FlowRule blockFlowRule = buildOutpInstructionBlock(deviceId, 0);
+            flowRuleService.applyFlowRules(blockFlowRule);
+            instructionBlockSentCache.add(blockFlowRule);
+        }
+        {
+            FlowRule blockFlowRule = buildOutpInstructionBlock(deviceId, 1);
+            flowRuleService.applyFlowRules(blockFlowRule);
+            instructionBlockSentCache.add(blockFlowRule);
+        }
+        {
+            FlowRule blockFlowRule = buildSuperDefaultInstructionBlock(deviceId, seanrs_next_tableid);
             flowRuleService.applyFlowRules(blockFlowRule);
             instructionBlockSentCache.add(blockFlowRule);
         }
@@ -475,9 +476,9 @@ public class SeanrsApp {
         return blockFlowRule;
     }
 
-    private FlowRule buildSetAddrAndGotoTableInstructionBlock(DeviceId deviceId, int offset, String ipAddress, int gotoTableId) {
+    private FlowRule buildSetAddrAndGotoTableInstructionBlock(DeviceId deviceId, String ipAddress, int gotoTableId) {
         log.debug("---------- build SetAddr&GotoTable instruction block for {} ----------", deviceId);
-        OFMatch20 ofMatch20 = new OFMatch20(FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 24 * 8, 16 * 8); // IPv6 dstAddr
+        OFMatch20 ofMatch20 = new OFMatch20(FieldId.PACKET, 24 * 8, 16 * 8); // IPv6 dstAddr
         InstructionBlockModTreatment instructionBlockModTreatment = new InstructionBlockModTreatment();
         instructionBlockModTreatment.addInstruction(new OFInstructionSetField(ofMatch20, ipAddress));
         instructionBlockModTreatment.addInstruction(new OFInstructionGotoTable(gotoTableId));
@@ -491,9 +492,10 @@ public class SeanrsApp {
         return blockFlowRule;
     }
 
-    private FlowRule buildGotoTableInstructionBlock(DeviceId deviceId, int gotoTableId) {
+    private FlowRule buildSetOffsetAndGotoTableInstructionBlock(DeviceId deviceId, int gotoTableId) {
         log.debug("---------- build GotoTable{} instruction block for {} ----------", gotoTableId, deviceId);
         InstructionBlockModTreatment instructionBlockModTreatment = new InstructionBlockModTreatment();
+        instructionBlockModTreatment.addInstruction(new OFInstructionSetPacketOffset(14));
         instructionBlockModTreatment.addInstruction(new OFInstructionGotoTable(gotoTableId));
         TrafficTreatment.Builder trafficTreatmentBuilder = DefaultTrafficTreatment.builder().extension(instructionBlockModTreatment, deviceId);
 
@@ -505,11 +507,11 @@ public class SeanrsApp {
         return blockFlowRule;
     }
 
-    private FlowRule buildSuperDefaultInstructionBlock(DeviceId deviceId, int offset, int gotoTableId) {
+    private FlowRule buildSuperDefaultInstructionBlock(DeviceId deviceId, int gotoTableId) {
         log.debug("---------- build super-default{} instruction block for {} ----------", gotoTableId, deviceId);
-        OFMatch20 idpNhField = new OFMatch20(FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 40 * 8, 8);
-        OFMatch20 dstIpField = new OFMatch20(FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 24 * 8, 16 * 8);
-        OFMatch20 queryTypeField = new OFMatch20(FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 85 * 8, 8); // NRS_QueryType
+        OFMatch20 idpNhField = new OFMatch20(FieldId.PACKET, 40 * 8, 8);
+        OFMatch20 dstIpField = new OFMatch20(FieldId.PACKET, 24 * 8, 16 * 8);
+        OFMatch20 queryTypeField = new OFMatch20(FieldId.PACKET, 85 * 8, 8); // NRS_QueryType
         OFMatch20 inportField = new OFMatch20(FieldId.INPORT, 0, 2 * 8); // In port
         InstructionBlockModTreatment instructionBlockModTreatment = new InstructionBlockModTreatment();
         instructionBlockModTreatment.addInstruction(new OFInstructionBranch(14, idpNhField, "10"));
@@ -555,7 +557,7 @@ public class SeanrsApp {
         try {
 //          add drop entry and goto nrs_table entry for first table
             addDropFlowEntry(deviceId, FIRST_TABLE);
-            addFirstGoToTableFlowEntry(deviceId, FIRST_TABLE, mobility_tableid_for_ipv6, "00", PKTIN_PRIORITY);
+            addFirstGoToTableFlowEntry(deviceId, FIRST_TABLE, seanrs_next_tableid, "00", PKTIN_PRIORITY);
             addFirstGoToTableFlowEntry(deviceId, FIRST_TABLE, seanrs_tableid_ipv6, "FF", FORWARD_PRIORITY);
 
 //          add fib match ipv6_address action: output port entry for fib table
@@ -564,13 +566,11 @@ public class SeanrsApp {
 
 //          add packet_in entry for nrs_table
             addPacketInFlowEntry(deviceId, seanrs_tableid_ipv6);
-            addPacketInFlowEntry(deviceId, seanrs_tableid_vlan);
-            addPacketInFlowEntry(deviceId, seanrs_tableid_qinq);
 
-//          add super default entry for nrs_table
-            addSuperDefaultFlowEntry(deviceId, seanrs_tableid_ipv6, mobility_tableid_for_ipv6);
-            addSuperDefaultFlowEntry(deviceId, seanrs_tableid_vlan, mobility_tableid_for_vlan);
-            addSuperDefaultFlowEntry(deviceId, seanrs_tableid_qinq, mobility_tableid_for_qinq);
+////          add super default entry for nrs_table
+//            addSuperDefaultFlowEntry(deviceId, seanrs_tableid_ipv6, seanrs_next_tableid);
+//            addSuperDefaultFlowEntry(deviceId, seanrs_tableid_vlan, seanrs_next_tableid_for_vlan);
+//            addSuperDefaultFlowEntry(deviceId, seanrs_tableid_qinq, seanrs_next_tableid_for_qinq);
         } catch (Exception e) {
             log.error(e.getMessage(), e);
         }
@@ -578,19 +578,12 @@ public class SeanrsApp {
 
     private void addPacketInFlowEntry(DeviceId deviceId, int tableId) {
         log.debug("---------- add PacketIn flow entry for table{}, device:{} ----------", tableId, deviceId);
-        // packet offset
-        int offset = 0;
-        if (tableId == seanrs_tableid_vlan) {
-            offset = 4;
-        } else if (tableId == seanrs_tableid_qinq) {
-            offset = 8;
-        }
         // construct selector
         OFMatchXSelector selector = new OFMatchXSelector();
-        selector.addOFMatchX("IPV6_DST", FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + (24 * 8), (16 * 8), NA_ZEROS, HexUtil.duplicates('F', 32));
-        selector.addOFMatchX("NRS_NextHeader", FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + (40 * 8), (8), "10", "FF");
-        selector.addOFMatchX("destEID16", FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 64 * 8, 16 * 8, HexUtil.duplicates('F', 32), HexUtil.duplicates('F', 32)); // DEST_EID (1-16Byte)
-        selector.addOFMatchX("destEID4", FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 80 * 8, 4 * 8, HexUtil.duplicates('F', 8), HexUtil.duplicates('F', 8)); // DEST_EID (16-20Byte)
+        selector.addOFMatchX("IPV6_DST", FieldId.PACKET, (24 * 8), (16 * 8), NA_ZEROS, HexUtil.duplicates('F', 32));
+        selector.addOFMatchX("NRS_NextHeader", FieldId.PACKET, (40 * 8), (8), "10", "FF");
+        selector.addOFMatchX("destEID16", FieldId.PACKET, 64 * 8, 16 * 8, HexUtil.duplicates('F', 32), HexUtil.duplicates('F', 32)); // DEST_EID (1-16Byte)
+        selector.addOFMatchX("destEID4", FieldId.PACKET, 80 * 8, 4 * 8, HexUtil.duplicates('F', 8), HexUtil.duplicates('F', 8)); // DEST_EID (16-20Byte)
         TrafficSelector.Builder trafficSelectorBuilder = DefaultTrafficSelector.builder();
         trafficSelectorBuilder.extension(selector, deviceId);
 
@@ -731,7 +724,7 @@ public class SeanrsApp {
         log.debug("---------- add DROP flow entry for table{}, device:{} ----------", tableId, deviceId);
         // construct selector
         OFMatchXSelector selector = new OFMatchXSelector();
-        selector.addOFMatchX("IPv6_DST", FieldId.PACKET, ETH_HEADER_LEN + 24 * 8, 16 * 8, ipv6DstAddr, mask); // DEST_IPV6_ADDR
+        selector.addOFMatchX("IPv6_DST", FieldId.PACKET, 24 * 8, 16 * 8, ipv6DstAddr, mask); // DEST_IPV6_ADDR
         TrafficSelector.Builder trafficSelectorBuilder = DefaultTrafficSelector.builder();
         trafficSelectorBuilder.extension(selector, deviceId);
 
@@ -841,24 +834,17 @@ public class SeanrsApp {
 
     private void addSetIPDstAddrAndGoToTableFlowEntry(DeviceId deviceId, String eid, String na, int tableId, int gotoTableId) {
         log.info("---------- add Set IPDstAddr And GoToTable flow entry for table{}, device:{} ----------", tableId, deviceId);
-        // packet offset
-        int offset = 0;
-        if (tableId == seanrs_tableid_vlan) {
-            offset = 4;
-        } else if (tableId == seanrs_tableid_qinq) {
-            offset = 8;
-        }
         // construct selector
         OFMatchXSelector selector = new OFMatchXSelector();
-        selector.addOFMatchX("IPV6_DST", FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + (24 * 8), 16 * 8, NA_ZEROS, HexUtil.duplicates('F', 32));
-        selector.addOFMatchX("NRS_NextHeader", FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + (40 * 8), 8, "10", "FF");
-        selector.addOFMatchX("destEID16", FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 64 * 8, 16 * 8, eid.substring(0, 32), HexUtil.duplicates('F', 32)); // DEST_EID (1-16Byte)
-        selector.addOFMatchX("destEID4", FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 80 * 8, 4 * 8, eid.substring(32, 40), HexUtil.duplicates('F', 8)); // DEST_EID (16-20Byte)
+        selector.addOFMatchX("IPV6_DST", FieldId.PACKET, (24 * 8), 16 * 8, NA_ZEROS, HexUtil.duplicates('F', 32));
+        selector.addOFMatchX("NRS_NextHeader", FieldId.PACKET, (40 * 8), 8, "10", "FF");
+        selector.addOFMatchX("destEID16", FieldId.PACKET, 64 * 8, 16 * 8, eid.substring(0, 32), HexUtil.duplicates('F', 32)); // DEST_EID (1-16Byte)
+        selector.addOFMatchX("destEID4", FieldId.PACKET, 80 * 8, 4 * 8, eid.substring(32, 40), HexUtil.duplicates('F', 8)); // DEST_EID (16-20Byte)
         TrafficSelector.Builder trafficSelectorBuilder = DefaultTrafficSelector.builder();
         trafficSelectorBuilder.extension(selector, deviceId);
 
         // construct treatment
-        FlowModTreatment flowModTreatment = new FlowModTreatment(buildSetAddrAndGotoTableInstructionBlock(deviceId, offset, na, gotoTableId).id().value());
+        FlowModTreatment flowModTreatment = new FlowModTreatment(buildSetAddrAndGotoTableInstructionBlock(deviceId, na, gotoTableId).id().value());
         TrafficTreatment.Builder trafficTreatmentBuilder = DefaultTrafficTreatment.builder();
         trafficTreatmentBuilder.extension(flowModTreatment, deviceId);
 
@@ -893,7 +879,7 @@ public class SeanrsApp {
         selector.addOFMatchX("destEID4", FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 80 * 8, 4 * 8, HexUtil.zeros(8), HexUtil.zeros(8)); // DEST_EID (16-20Byte)
         TrafficSelector.Builder trafficSelectorBuilder = DefaultTrafficSelector.builder();
         trafficSelectorBuilder.extension(selector, deviceId);
-        FlowModTreatment flowModTreatment = new FlowModTreatment(buildGotoTableInstructionBlock(deviceId, goToTableId).id().value());
+        FlowModTreatment flowModTreatment = new FlowModTreatment(buildSetOffsetAndGotoTableInstructionBlock(deviceId, goToTableId).id().value());
 
         //construct treatment
         TrafficTreatment.Builder trafficTreatmentBuilder = DefaultTrafficTreatment.builder();
@@ -916,22 +902,15 @@ public class SeanrsApp {
 
     private void addSuperDefaultFlowEntry(DeviceId deviceId, int tableId, int goToTableId) {
         log.debug("---------- add default flow entry for table{}, device:{} ----------", tableId, deviceId);
-        // packet offset
-        int offset = 0;
-        if (tableId == seanrs_tableid_vlan) {
-            offset = 4;
-        } else if (tableId == seanrs_tableid_qinq) {
-            offset = 8;
-        }
         // construct selector
         OFMatchXSelector selector = new OFMatchXSelector();
-        selector.addOFMatchX("IPV6_DST", FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + (24 * 8), (16 * 8), NA_ZEROS, HexUtil.zeros(32));
-        selector.addOFMatchX("NRS_NextHeader", FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + (40 * 8), (8), "10", "00");
-        selector.addOFMatchX("destEID16", FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 64 * 8, 16 * 8, HexUtil.zeros(32), HexUtil.zeros(32)); // DEST_EID (1-16Byte)
-        selector.addOFMatchX("destEID4", FieldId.PACKET, offset * 8 + ETH_HEADER_LEN + 80 * 8, 4 * 8, HexUtil.zeros(8), HexUtil.zeros(8)); // DEST_EID (16-20Byte)
+        selector.addOFMatchX("IPV6_DST", FieldId.PACKET, (24 * 8), (16 * 8), NA_ZEROS, HexUtil.zeros(32));
+        selector.addOFMatchX("NRS_NextHeader", FieldId.PACKET, (40 * 8), (8), "10", "00");
+        selector.addOFMatchX("destEID16", FieldId.PACKET, 64 * 8, 16 * 8, HexUtil.zeros(32), HexUtil.zeros(32)); // DEST_EID (1-16Byte)
+        selector.addOFMatchX("destEID4", FieldId.PACKET, 80 * 8, 4 * 8, HexUtil.zeros(8), HexUtil.zeros(8)); // DEST_EID (16-20Byte)
         TrafficSelector.Builder trafficSelectorBuilder = DefaultTrafficSelector.builder();
         trafficSelectorBuilder.extension(selector, deviceId);
-        FlowModTreatment flowModTreatment = new FlowModTreatment(buildSuperDefaultInstructionBlock(deviceId, offset, goToTableId).id().value());
+        FlowModTreatment flowModTreatment = new FlowModTreatment(buildSuperDefaultInstructionBlock(deviceId, goToTableId).id().value());
 
         //construct treatment
         TrafficTreatment.Builder trafficTreatmentBuilder = DefaultTrafficTreatment.builder();
@@ -960,7 +939,7 @@ public class SeanrsApp {
         selector.addOFMatchX("IDP_NH", FieldId.PACKET, ETH_HEADER_LEN + 40 * 8, 8, "10", mask);
         TrafficSelector.Builder trafficSelectorBuilder = DefaultTrafficSelector.builder();
         trafficSelectorBuilder.extension(selector, deviceId);
-        FlowModTreatment flowModTreatment = new FlowModTreatment(buildGotoTableInstructionBlock(deviceId, goToTableId).id().value());
+        FlowModTreatment flowModTreatment = new FlowModTreatment(buildSetOffsetAndGotoTableInstructionBlock(deviceId, goToTableId).id().value());
         //construct treatment
         TrafficTreatment.Builder trafficTreatmentBuilder = DefaultTrafficTreatment.builder();
         trafficTreatmentBuilder.extension(flowModTreatment, deviceId);
@@ -1178,7 +1157,7 @@ public class SeanrsApp {
                     NRS nrsPkt = new NRS().unpack(idpPkt.getPayload());
                     String queryType = HexUtil.byte2HexString(nrsPkt.getQueryType());
                     OFInstruction ofInstructionCopyToAE = new OFInstructionOutput(OutPutType.OUTAEM, 0, 0xffff);
-                    OFInstruction ofInstructionGotoTable = new OFInstructionGotoTable(mobility_tableid_for_ipv6);
+                    OFInstruction ofInstructionGotoTable = new OFInstructionGotoTable(seanrs_next_tableid);
                     InstructionTreatment treatment = new InstructionTreatment();
 
                     // TODO: 2021/8/22 register or deregister
@@ -1333,17 +1312,7 @@ public class SeanrsApp {
                         // TODO: 2021/8/30 是否下发流表项，下发策略？ 解析失败则不下表项？
                         if (dstEid != null && na_num != 0) {
                             {
-                                FlowRule blockFlowRule = buildSetAddrAndGotoTableInstructionBlock(deviceId, 0, na, mobility_tableid_for_ipv6);
-                                flowRuleService.applyFlowRules(blockFlowRule);
-                                instructionBlockSentCache.add(blockFlowRule);
-                            }
-                            {
-                                FlowRule blockFlowRule = buildSetAddrAndGotoTableInstructionBlock(deviceId, 4, na, mobility_tableid_for_vlan);
-                                flowRuleService.applyFlowRules(blockFlowRule);
-                                instructionBlockSentCache.add(blockFlowRule);
-                            }
-                            {
-                                FlowRule blockFlowRule = buildSetAddrAndGotoTableInstructionBlock(deviceId, 8, na, mobility_tableid_for_qinq);
+                                FlowRule blockFlowRule = buildSetAddrAndGotoTableInstructionBlock(deviceId, na, seanrs_next_tableid);
                                 flowRuleService.applyFlowRules(blockFlowRule);
                                 instructionBlockSentCache.add(blockFlowRule);
                             }
@@ -1357,16 +1326,14 @@ public class SeanrsApp {
                                         e.printStackTrace();
                                     }
                                 }
-                                addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, finalNa, seanrs_tableid_ipv6, mobility_tableid_for_ipv6);
-                                addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, finalNa, seanrs_tableid_vlan, mobility_tableid_for_vlan);
-                                addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, finalNa, seanrs_tableid_qinq, mobility_tableid_for_qinq);
+                                addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, finalNa, seanrs_tableid_ipv6, seanrs_next_tableid);
                             });
 
                         }
                         // 解析包的话需要把解析结果带给AE进行缓存更新
                         treatment.addInstruction(ofInstructionCopyToAE);
                     }
-//                    FlowModTreatment flowModTreatment = new FlowModTreatment(buildGotoTableInstructionBlock(deviceId, mobility_tableid_for_ipv6).id().value());
+//                    FlowModTreatment flowModTreatment = new FlowModTreatment(buildSetOffsetAndGotoTableInstructionBlock(deviceId, seanrs_next_tableid).id().value());
 //                  send packet out, bind(copyToAE and GoToTable)
                     treatment.addInstruction(ofInstructionGotoTable);
                     TrafficTreatment.Builder builder = DefaultTrafficTreatment.builder();
