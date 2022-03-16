@@ -395,6 +395,11 @@ public class SeanrsApp {
             instructionBlockSentCache.add(blockFlowRule);
         }
         {
+            FlowRule blockFlowRule = buildSetOffsetAndGotoTableInstructionBlock(deviceId, seanrs_next_tableid);
+            flowRuleService.applyFlowRules(blockFlowRule);
+            instructionBlockSentCache.add(blockFlowRule);
+        }
+        {
             FlowRule blockFlowRule = buildDropInstructionBlock(deviceId);
             flowRuleService.applyFlowRules(blockFlowRule);
             instructionBlockSentCache.add(blockFlowRule);
