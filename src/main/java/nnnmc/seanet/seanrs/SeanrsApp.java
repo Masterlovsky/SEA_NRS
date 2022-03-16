@@ -200,9 +200,9 @@ public class SeanrsApp {
                 DeviceId deviceId = device.id();
                 NodeId master = mastershipService.getMasterFor(deviceId);
                 if (Objects.equals(local, master)) {
-                    buildNRSTables(deviceId);
-                    log.debug("activate: {} add FlowTable for NRS App. allNRSTablesStored(deviceId)={}, " + "instructionBlockSentCache.size(deviceId)={}",
-                            deviceId, allNRSTablesStored(deviceId), instructionBlockSentCache.size(deviceId));
+                    addDefaultInstructionBlock(deviceId);
+                    log.debug("activate: {} add Default Instruction Block for NRS App. allInstructionBlocksInstalled(deviceId)={}, ",
+                            deviceId, allInstructionBlocksInstalled(deviceId));
                 }
             }
         }
@@ -977,34 +977,35 @@ public class SeanrsApp {
                         NodeId master = mastershipService.getMasterFor(deviceId);
                         if (Objects.equals(local, master)) {
                             switch (rule.type()) {
-                                case FlowRuleType.TABLE_MOD: //flow table add
-                                {
-                                    if (tableSentCache.contains(rule)) {
-                                        tableInstalledCache.add(rule);
-                                        if (allNRSTablesInstalled(deviceId) && (instructionBlockSentCache.size(deviceId) == 0)) {
-                                            executor.execute(() -> addDefaultInstructionBlock(deviceId));
-                                        }
-                                    }
-                                }
-                                break;
                                 case FlowRuleType.INSTRUCTION_BLOCK_MOD: //instruction block add
                                 {
                                     executor.execute(() -> {
                                         if (instructionBlockSentCache.contains(rule)) {
 //                                            log.debug("INSTRUCTION_BLOCK_MOD instructionBlockSentCache.contains {}\n", rule);
                                             instructionBlockInstalledCache.add(rule);
-                                            //需要的默认指令块全部添加完毕，则下发表项; 如果该设备上的表项已经下发完成则不再下发
-                                            if (allInstructionBlocksInstalled(deviceId) && !getProcessStatusByDeviceId(deviceId)) {
+                                            //需要的默认指令块全部添加完毕，则下发流表;
+                                            if (allInstructionBlocksInstalled(deviceId)) {
                                                 //log.debug("INSTRUCTION_BLOCK_MOD call onDefaultBlocksAddedByDevice,add default entries\n");
                                                 executor.execute(() -> {
-                                                    addDefaultFlowEntry(deviceId);
-                                                    processedSetAdd(deviceId);
+                                                    buildNRSTables(deviceId);
                                                 });
                                             }
                                         }
                                     });
                                     break;
                                 }
+                                case FlowRuleType.TABLE_MOD: //flow table add
+                                {
+                                    if (tableSentCache.contains(rule)) {
+                                        tableInstalledCache.add(rule);
+                                        // 如果该设备上的流表已经下发完成则开始下发表项
+                                        if (allNRSTablesInstalled(deviceId) && !getProcessStatusByDeviceId(deviceId)) {
+                                            executor.execute(() -> addDefaultFlowEntry(deviceId));
+                                            processedSetAdd(deviceId);
+                                        }
+                                    }
+                                }
+                                break;
                                 default:
                                     break;
                             }
@@ -1055,7 +1056,7 @@ public class SeanrsApp {
                     NodeId master = mastershipService.getMasterFor(deviceId);
                     if (deviceId.toString().startsWith("pof")) {
                         if (Objects.equals(local, master) && (tableSentCache.size(deviceId) == 0)) {
-                            buildNRSTables(deviceId);
+                            addDefaultInstructionBlock(deviceId);
                         } else {
                             executor.execute(() -> {
                                 removeOldFlowRules(deviceId);
