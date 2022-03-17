@@ -989,10 +989,11 @@ public class SeanrsApp {
 //                                            log.debug("INSTRUCTION_BLOCK_MOD instructionBlockSentCache.contains {}\n", rule);
                                             instructionBlockInstalledCache.add(rule);
                                             //需要的默认指令块全部添加完毕，则下发流表;
-                                            if (allInstructionBlocksInstalled(deviceId)) {
+                                            if (allInstructionBlocksInstalled(deviceId) && !getProcessStatusByDeviceId(deviceId)) {
                                                 //log.debug("INSTRUCTION_BLOCK_MOD call onDefaultBlocksAddedByDevice,add default entries\n");
                                                 executor.execute(() -> {
                                                     buildNRSTables(deviceId);
+                                                    processedSetAdd(deviceId);
                                                 });
                                             }
                                         }
@@ -1004,9 +1005,8 @@ public class SeanrsApp {
                                     if (tableSentCache.contains(rule)) {
                                         tableInstalledCache.add(rule);
                                         // 如果该设备上的流表已经下发完成则开始下发表项
-                                        if (allNRSTablesInstalled(deviceId) && !getProcessStatusByDeviceId(deviceId)) {
+                                        if (allNRSTablesInstalled(deviceId)) {
                                             executor.execute(() -> addDefaultFlowEntry(deviceId));
-                                            processedSetAdd(deviceId);
                                         }
                                     }
                                 }
