@@ -1133,8 +1133,11 @@ public class SeanrsApp {
         private void nrsPacketInProcess(PacketContext context) {
             InboundPacket pkt = context.inPacket();
             ConnectPoint ingressPort = pkt.receivedFrom();
-            log.info(">>>> packet ingress port: " + ingressPort.toString());
             Interface anInterface = interfaceService.getInterfacesByPort(ingressPort).stream().findFirst().orElse(null);
+            if (anInterface == null) {
+                log.info(">>>> packet ingress port: " + ingressPort.toString() + " interface is fromAE <<<<");
+                anInterface = interfaceService.getInterfacesByDeviceId(ingressPort.deviceId()).stream().findFirst().orElse(null);
+            }
             IpAddress ipAddress = Objects.requireNonNull(anInterface).ipAddressesList().get(1).ipAddress();
             String fromSwitchIP = ipAddress.toInetAddress().getHostAddress();
             String fromSwitchIP_hex = HexUtil.ip2HexString(fromSwitchIP, 32);
