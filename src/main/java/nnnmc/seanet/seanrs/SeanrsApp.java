@@ -1166,10 +1166,6 @@ public class SeanrsApp {
                 if (nextHeader.equals("10")) {
                     NRS nrsPkt = new NRS().unpack(idpPkt.getPayload());
                     String queryType = HexUtil.byte2HexString(nrsPkt.getQueryType());
-                    OFInstruction ofInstructionCopyToAE = new OFInstructionOutput(OutPutType.OUTAEM, 0, 0xffff);
-                    OFInstruction ofInstructionGotoTable = new OFInstructionGotoTable(seanrs_next_tableid);
-                    InstructionTreatment treatment = new InstructionTreatment();
-
                     // TODO: 2021/8/22 register or deregister
                     //noinspection IfCanBeSwitch
                     if (queryType.equals("01") || queryType.equals("02")) {
@@ -1341,10 +1337,20 @@ public class SeanrsApp {
 
                         }
                         // 解析包的话需要把解析结果带给AE进行缓存更新
+                        OFInstruction ofInstructionCopyToAE = new OFInstructionOutput(OutPutType.OUTAE, 0, 0xffff);
+                        InstructionTreatment treatment = new InstructionTreatment();
                         treatment.addInstruction(ofInstructionCopyToAE);
+                        TrafficTreatment.Builder builder = DefaultTrafficTreatment.builder();
+                        builder.extension(treatment, deviceId);
+                        byte[] outPutBytes = ethPkt.serialize();
+                        ByteBuffer bf = ByteBuffer.allocate(outPutBytes.length);
+                        bf.put(outPutBytes).flip();
+                        packetService.emit(new DefaultOutboundPacket(deviceId, builder.build(), bf));
                     }
-//                    FlowModTreatment flowModTreatment = new FlowModTreatment(buildSetOffsetAndGotoTableInstructionBlock(deviceId, seanrs_next_tableid).id().value());
-//                  send packet out, bind(copyToAE and GoToTable)
+//                  FlowModTreatment flowModTreatment = new FlowModTreatment(buildSetOffsetAndGotoTableInstructionBlock(deviceId, seanrs_next_tableid).id().value());
+//                  send packet out, bind(GoToTable)
+                    OFInstruction ofInstructionGotoTable = new OFInstructionGotoTable(seanrs_next_tableid);
+                    InstructionTreatment treatment = new InstructionTreatment();
                     treatment.addInstruction(ofInstructionGotoTable);
                     TrafficTreatment.Builder builder = DefaultTrafficTreatment.builder();
                     builder.extension(treatment, deviceId);
