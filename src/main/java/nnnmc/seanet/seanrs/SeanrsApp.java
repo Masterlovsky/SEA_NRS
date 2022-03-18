@@ -1296,6 +1296,7 @@ public class SeanrsApp {
                                 idpPkt.setPayload(nrsPkt.pack());
                                 IPv6 ipv6Pkt_copy = (IPv6) ipv6Pkt.clone();
                                 ipv6Pkt_copy.setPayload(new Data(idpPkt.pack()));
+                                ipv6Pkt_copy.setDestinationAddress(SocketUtil.hexStringToBytes(na));
                                 Ethernet eth_pkt_copy = (Ethernet) ethPkt.clone();
                                 eth_pkt_copy.setPayload(ipv6Pkt_copy);
                                 // 解析包的话需要把解析结果带给AE进行缓存更新
