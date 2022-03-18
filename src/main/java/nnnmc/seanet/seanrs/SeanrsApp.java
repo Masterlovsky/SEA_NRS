@@ -1291,7 +1291,7 @@ public class SeanrsApp {
                                 // 解析成功!，将返回的NA的第一个填入ipv6的dstIP字段 TODO：是否有选ip的策略？
                                 na = SocketUtil.bytesToHexString(Arrays.copyOfRange(receive, 34, 50));
 //                                eid_na_map.put(dstEid, na);
-                                //
+                                // 给AE发送缓存更新包, 这个包要重新走pipeline->goToTable0
                                 nrsPkt.setSource(SocketUtil.hexStringToBytes("02")[0]); // FromAE -> ToAE
                                 idpPkt.setPayload(nrsPkt.pack());
                                 IPv6 ipv6Pkt_copy = (IPv6) ipv6Pkt.clone();
@@ -1300,7 +1300,7 @@ public class SeanrsApp {
                                 Ethernet eth_pkt_copy = (Ethernet) ethPkt.clone();
                                 eth_pkt_copy.setPayload(ipv6Pkt_copy);
                                 // 解析包的话需要把解析结果带给AE进行缓存更新
-                                OFInstruction ofInstructionGotoTable = new OFInstructionGotoTable(seanrs_tableid_ipv6);
+                                OFInstruction ofInstructionGotoTable = new OFInstructionGotoTable(FIRST_TABLE);
                                 InstructionTreatment treatment = new InstructionTreatment();
                                 treatment.addInstruction(ofInstructionGotoTable);
                                 TrafficTreatment.Builder builder = DefaultTrafficTreatment.builder();
