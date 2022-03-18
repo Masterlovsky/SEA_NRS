@@ -48,6 +48,7 @@ import java.util.*;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static nnnmc.seanet.seanrs.OsgiPropertyConstants.*;
 import static org.onlab.util.Tools.groupedThreads;
@@ -517,13 +518,16 @@ public class SeanrsApp {
         OFMatch20 idpNhField = new OFMatch20(FieldId.PACKET, 40 * 8, 8);
         OFMatch20 dstIpField = new OFMatch20(FieldId.PACKET, 24 * 8, 16 * 8);
         OFMatch20 queryTypeField = new OFMatch20(FieldId.PACKET, 85 * 8, 8); // NRS_QueryType
+        OFMatch20 sourceField = new OFMatch20(FieldId.PACKET, 87 * 8, 8); // NRS_Source
         OFMatch20 inportField = new OFMatch20(FieldId.INPORT, 0, 2 * 8); // In port
         InstructionBlockModTreatment instructionBlockModTreatment = new InstructionBlockModTreatment();
-        instructionBlockModTreatment.addInstruction(new OFInstructionBranch(14, idpNhField, "10"));
+        instructionBlockModTreatment.addInstruction(new OFInstructionBranch(16, idpNhField, "10"));
         instructionBlockModTreatment.addInstruction(new OFInstructionBranch(2, queryTypeField, "03"));
         instructionBlockModTreatment.addInstruction(new OFInstructionPacketIn());
         instructionBlockModTreatment.addInstruction(new OFInstructionBranch(2, queryTypeField, "04"));
         instructionBlockModTreatment.addInstruction(new OFInstructionPacketIn());
+        instructionBlockModTreatment.addInstruction(new OFInstructionBranch(2, sourceField, "02"));
+        instructionBlockModTreatment.addInstruction(new OFInstructionOutput(OutPutType.OUTAE, 0xffff));
         instructionBlockModTreatment.addInstruction(new OFInstructionBranch(9, dstIpField, HexUtil.zeros(32)));
         instructionBlockModTreatment.addInstruction(new OFInstructionBranch(2, queryTypeField, "01"));
         instructionBlockModTreatment.addInstruction(new OFInstructionPacketIn());
@@ -1287,6 +1291,24 @@ public class SeanrsApp {
                                 // 解析成功!，将返回的NA的第一个填入ipv6的dstIP字段 TODO：是否有选ip的策略？
                                 na = SocketUtil.bytesToHexString(Arrays.copyOfRange(receive, 34, 50));
 //                                eid_na_map.put(dstEid, na);
+                                //
+                                nrsPkt.setSource(SocketUtil.hexStringToBytes("02")[0]); // FromAE -> ToAE
+                                idpPkt.setPayload(nrsPkt.pack());
+                                IPv6 ipv6Pkt_copy = (IPv6) ipv6Pkt.clone();
+                                ipv6Pkt_copy.setPayload(new Data(idpPkt.pack()));
+                                Ethernet eth_pkt_copy = (Ethernet) ethPkt.clone();
+                                eth_pkt_copy.setPayload(ipv6Pkt_copy);
+                                // 解析包的话需要把解析结果带给AE进行缓存更新
+                                OFInstruction ofInstructionGotoTable = new OFInstructionGotoTable(seanrs_tableid_ipv6);
+                                InstructionTreatment treatment = new InstructionTreatment();
+                                treatment.addInstruction(ofInstructionGotoTable);
+                                TrafficTreatment.Builder builder = DefaultTrafficTreatment.builder();
+                                builder.extension(treatment, deviceId);
+                                byte[] outPutBytes = eth_pkt_copy.serialize();
+                                ByteBuffer bf = ByteBuffer.allocate(outPutBytes.length);
+                                bf.put(outPutBytes).flip();
+                                packetService.emit(new DefaultOutboundPacket(deviceId, builder.build(), bf));
+                                log.info(">>>> packet for updating AE cache: " + SocketUtil.bytesToHexString(outPutBytes) + " <<<<");
                             } else {
                                 // 解析不到
                                 String source = HexUtil.byte2HexString(nrsPkt.getSource());
@@ -1336,16 +1358,6 @@ public class SeanrsApp {
                             });
 
                         }
-                        // 解析包的话需要把解析结果带给AE进行缓存更新
-                        OFInstruction ofInstructionCopyToAE = new OFInstructionOutput(OutPutType.OUTAE, 0, 0xffff);
-                        InstructionTreatment treatment = new InstructionTreatment();
-                        treatment.addInstruction(ofInstructionCopyToAE);
-                        TrafficTreatment.Builder builder = DefaultTrafficTreatment.builder();
-                        builder.extension(treatment, deviceId);
-                        byte[] outPutBytes = ethPkt.serialize();
-                        ByteBuffer bf = ByteBuffer.allocate(outPutBytes.length);
-                        bf.put(outPutBytes).flip();
-                        packetService.emit(new DefaultOutboundPacket(deviceId, builder.build(), bf));
                     }
 //                  FlowModTreatment flowModTreatment = new FlowModTreatment(buildSetOffsetAndGotoTableInstructionBlock(deviceId, seanrs_next_tableid).id().value());
 //                  send packet out, bind(GoToTable)
@@ -1358,6 +1370,7 @@ public class SeanrsApp {
                     ByteBuffer bf = ByteBuffer.allocate(outPutBytes.length);
                     bf.put(outPutBytes).flip();
                     packetService.emit(new DefaultOutboundPacket(deviceId, builder.build(), bf));
+                    log.info(">>>> packet out: " + SocketUtil.bytesToHexString(outPutBytes) + " <<<<");
                 }
                 // 不是网内解析请求则不处理
                 else {
