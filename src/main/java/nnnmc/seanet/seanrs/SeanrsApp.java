@@ -1300,11 +1300,11 @@ public class SeanrsApp {
                                 Ethernet eth_pkt_copy = (Ethernet) ethPkt.clone();
                                 eth_pkt_copy.setPayload(ipv6Pkt_copy);
                                 // 解析包的话需要把解析结果带给AE进行缓存更新
-                                OFInstruction ofInstructionGotoTable = new OFInstructionGotoTable(FIRST_TABLE);
-                                InstructionTreatment treatment = new InstructionTreatment();
-                                treatment.addInstruction(ofInstructionGotoTable);
+                                OFInstruction ofInstructionGotoTable1 = new OFInstructionGotoTable(FIRST_TABLE);
+                                InstructionTreatment treatment_ae = new InstructionTreatment();
+                                treatment_ae.addInstruction(ofInstructionGotoTable1);
                                 TrafficTreatment.Builder builder = DefaultTrafficTreatment.builder();
-                                builder.extension(treatment, deviceId);
+                                builder.extension(treatment_ae, deviceId);
                                 byte[] outPutBytes = eth_pkt_copy.serialize();
                                 ByteBuffer bf = ByteBuffer.allocate(outPutBytes.length);
                                 bf.put(outPutBytes).flip();
@@ -1362,8 +1362,9 @@ public class SeanrsApp {
                     }
 //                  FlowModTreatment flowModTreatment = new FlowModTreatment(buildSetOffsetAndGotoTableInstructionBlock(deviceId, seanrs_next_tableid).id().value());
 //                  send packet out, bind(GoToTable)
-                    OFInstruction ofInstructionGotoTable = new OFInstructionGotoTable(seanrs_next_tableid);
                     InstructionTreatment treatment = new InstructionTreatment();
+                    treatment.addInstruction(new OFInstructionMovePacketOffset(0, ETH_HEADER_LEN / 8));
+                    OFInstruction ofInstructionGotoTable = new OFInstructionGotoTable(seanrs_next_tableid);
                     treatment.addInstruction(ofInstructionGotoTable);
                     TrafficTreatment.Builder builder = DefaultTrafficTreatment.builder();
                     builder.extension(treatment, deviceId);
