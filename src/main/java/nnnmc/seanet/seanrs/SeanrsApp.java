@@ -1363,8 +1363,8 @@ public class SeanrsApp {
 //                  FlowModTreatment flowModTreatment = new FlowModTreatment(buildSetOffsetAndGotoTableInstructionBlock(deviceId, seanrs_next_tableid).id().value());
 //                  send packet out, bind(GoToTable)
                     InstructionTreatment treatment = new InstructionTreatment();
-                    treatment.addInstruction(new OFInstructionMovePacketOffset(0, ETH_HEADER_LEN / 8));
-                    OFInstruction ofInstructionGotoTable = new OFInstructionGotoTable(seanrs_next_tableid);
+//                    treatment.addInstruction(new OFInstructionMovePacketOffset(0, ETH_HEADER_LEN / 8)); // 这个packetOut不支持！所以所有包重新走pipeline
+                    OFInstruction ofInstructionGotoTable = new OFInstructionGotoTable(FIRST_TABLE);
                     treatment.addInstruction(ofInstructionGotoTable);
                     TrafficTreatment.Builder builder = DefaultTrafficTreatment.builder();
                     builder.extension(treatment, deviceId);
