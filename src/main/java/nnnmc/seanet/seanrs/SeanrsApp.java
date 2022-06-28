@@ -842,7 +842,7 @@ public class SeanrsApp {
     }
 
     private void addSetIPDstAddrAndGoToTableFlowEntry(DeviceId deviceId, String eid, String na, int tableId, int gotoTableId) {
-        log.info("---------- add Set IPDstAddr And GoToTable flow entry for table{}, device:{} ----------", tableId, deviceId);
+        log.debug("---------- add Set IPDstAddr And GoToTable flow entry for table{}, device:{} ----------", tableId, deviceId);
         // construct selector
         OFMatchXSelector selector = new OFMatchXSelector();
         selector.addOFMatchX("IPV6_DST", FieldId.PACKET, (24 * 8), 16 * 8, NA_ZEROS, HexUtil.duplicates('F', 32));
@@ -1139,13 +1139,13 @@ public class SeanrsApp {
             ConnectPoint ingressPort = pkt.receivedFrom();
             Interface anInterface = interfaceService.getInterfacesByPort(ingressPort).stream().findFirst().orElse(null);
             if (anInterface == null) {
-                log.info(">>>> packet ingress port: " + ingressPort.toString() + " interface is fromAE <<<<");
+                //log.info(">>>> packet ingress port: " + ingressPort.toString() + " interface is fromAE <<<<");
                 anInterface = interfaceService.getInterfacesByDeviceId(ingressPort.deviceId()).stream().findFirst().orElse(null);
             }
             IpAddress ipAddress = Objects.requireNonNull(anInterface).ipAddressesList().get(1).ipAddress();
             String fromSwitchIP = ipAddress.toInetAddress().getHostAddress();
             String fromSwitchIP_hex = HexUtil.ip2HexString(fromSwitchIP, 32);
-            log.info(">>>> receive pkt from switch, ip: " + fromSwitchIP + ", port: " + ingressPort.port().toLong() + " <<<<");
+            //log.info(">>>> receive pkt from switch, ip: " + fromSwitchIP + ", port: " + ingressPort.port().toLong() + " <<<<");
             DeviceId deviceId = ingressPort.deviceId();
             Ethernet ethPkt = pkt.parsed();
             // TODO: 2021/8/22 Vlan 和 Qinq 先不处理
@@ -1182,8 +1182,8 @@ public class SeanrsApp {
                             if (receive != null) {
                                 if (Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).startsWith("01", 10)) {
                                     // 注册或注销成功，改payload为格式2，转发给BGP, 控制器不返回注册注销响应报文
-                                    log.info(">>>> irs-{} response: {} <<<<", queryType.equals("01") ? "register" : "deregister",
-                                            Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).replaceAll("(00)+$", ""));
+                                    //log.info(">>>> irs-{} response: {} <<<<", queryType.equals("01") ? "register" : "deregister",
+//                                            Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).replaceAll("(00)+$", ""));
                                     int total_len = 1 + 20 + 16 + 16 + 4 + bgpNum * 16;
                                     ByteArrayOutputStream baos = new ByteArrayOutputStream(total_len);
                                     try {
@@ -1207,8 +1207,8 @@ public class SeanrsApp {
                                     String BGP_NA = bgp_Na_List.get(0); // TODO: 2021/8/23 暂时从BGP列表中选取选取第一个发送
                                     ipv6Pkt.setDestinationAddress(SocketUtil.hexStringToBytes(HexUtil.ip2HexString(BGP_NA, 32)));
                                     ethPkt.setPayload(ipv6Pkt);
-                                    log.info(">>>> {} success! ready to send packet: {} to BGP: {} <<<<", queryType.equals("01") ? "register" : "deregister",
-                                            SocketUtil.bytesToHexString(ethPkt.serialize()), BGP_NA);
+                                    //log.info(">>>> {} success! ready to send packet: {} to BGP: {} <<<<", queryType.equals("01") ? "register" : "deregister",
+//                                            SocketUtil.bytesToHexString(ethPkt.serialize()), BGP_NA);
                                 } else {
                                     flag = false;
                                     log.error("Receive IRS register/deregister response status is failed");
@@ -1285,8 +1285,8 @@ public class SeanrsApp {
                         String na = HexUtil.zeros(32);
                         int na_num = SocketUtil.byteArrayToShort(receive, 12);
                         if (receive[1] == 1) {
-                            log.info(">>>> irs-resolve response: {} , NA number: {} <<<<",
-                                    Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).replaceAll("(00)+$", ""), na_num);
+                            //log.info(">>>> irs-resolve response: {} , NA number: {} <<<<",
+//                                    Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).replaceAll("(00)+$", ""), na_num);
                             if (na_num > 0) {
                                 // 解析成功!，将返回的NA的第一个填入ipv6的dstIP字段 TODO：是否有选ip的策略？
                                 na = SocketUtil.bytesToHexString(Arrays.copyOfRange(receive, 34, 50));
@@ -1309,7 +1309,7 @@ public class SeanrsApp {
                                 ByteBuffer bf = ByteBuffer.allocate(outPutBytes.length);
                                 bf.put(outPutBytes).flip();
                                 packetService.emit(new DefaultOutboundPacket(deviceId, builder.build(), bf));
-                                log.info(">>>> packet for updating AE cache: " + SocketUtil.bytesToHexString(outPutBytes) + " <<<<");
+                                //log.info(">>>> packet for updating AE cache: " + SocketUtil.bytesToHexString(outPutBytes) + " <<<<");
                             } else {
                                 // 解析不到
                                 String source = HexUtil.byte2HexString(nrsPkt.getSource());
@@ -1372,7 +1372,7 @@ public class SeanrsApp {
                     ByteBuffer bf = ByteBuffer.allocate(outPutBytes.length);
                     bf.put(outPutBytes).flip();
                     packetService.emit(new DefaultOutboundPacket(deviceId, builder.build(), bf));
-                    log.info(">>>> packet out: " + SocketUtil.bytesToHexString(outPutBytes) + " <<<<");
+                    //log.info(">>>> packet out: " + SocketUtil.bytesToHexString(outPutBytes) + " <<<<");
                 }
                 // 不是网内解析请求则不处理
                 else {
