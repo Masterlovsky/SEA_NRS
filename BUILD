@@ -1,17 +1,21 @@
 COMPILE_DEPS = CORE_DEPS + JACKSON + CLI + [
 	"@jackson_core_asl//jar",
-    "@jackson_mapper_asl//jar",
-    "//protocols/pof/pofio:onos-protocols-pof-pofio",
+	"@jackson_mapper_asl//jar",
+	"@commons_pool2//jar",
+	"@jedis//jar",
+	"//protocols/pof/pofio:onos-protocols-pof-pofio",
 	'//protocols/pof/api:onos-protocols-pof-api',
 	'//apps/seanet/api:onos-apps-seanet-api',
 ]
 
 osgi_jar (
     deps = COMPILE_DEPS,
-    import_packages = '*,org.onosproject.cli.net',
+    import_packages = '*,org.onosproject.cli.net'
 )
 
 BUNDLES = [
+	"@commons_pool2//jar",
+	"@jedis//jar",
     '//apps/seanet/api:onos-apps-seanet-api',
 	'//apps/seanet/seanrs:onos-apps-seanet-seanrs',
 ]

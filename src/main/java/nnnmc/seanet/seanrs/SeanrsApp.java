@@ -4,9 +4,7 @@ import nnnmc.seanet.controller.api.FlowRuleCache;
 import nnnmc.seanet.seanrs.protocol.IDP;
 import nnnmc.seanet.seanrs.protocol.NRS;
 import nnnmc.seanet.seanrs.util.HexUtil;
-import nnnmc.seanet.seanrs.util.SendAndRecv;
 import nnnmc.seanet.seanrs.util.SocketUtil;
-import nnnmc.seanet.seanrs.util.Util;
 import org.onlab.packet.*;
 import org.onlab.util.Tools;
 import org.onosproject.cfg.ComponentConfigService;
@@ -48,7 +46,10 @@ import java.util.*;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.exceptions.JedisException;
 
 import static nnnmc.seanet.seanrs.OsgiPropertyConstants.*;
 import static org.onlab.util.Tools.groupedThreads;
@@ -123,7 +124,12 @@ public class SeanrsApp {
     private static final List<String> bgp_Na_List = new ArrayList<>();
     private static int bgpNum = BGP_NUM_DEFAULT;
     private static String bgpNaStr = BGP_NA;
-
+    // redis host
+    private static final String REDIS_HOST = "127.0.0.1";
+    // redis port
+    private static final int REDIS_PORT = 6379;
+    // the jedis connection jedisPool..
+    private static JedisPool jedisPool = null;
     private final FlowRuleCache instructionBlockSentCache = new FlowRuleCache();
     private final FlowRuleCache instructionBlockInstalledCache = new FlowRuleCache();
     private final FlowRuleCache flowEntrySentCache = new FlowRuleCache();
@@ -186,6 +192,15 @@ public class SeanrsApp {
         tableSentCache.clear();
         tableInstalledCache.clear();
 
+        // activate jedis poll
+        try {
+            jedisPool = new JedisPool(REDIS_HOST, REDIS_PORT);
+            log.info("SEANRS app - [redis]: {}:{}, jedisPool init success!", REDIS_HOST, REDIS_PORT);
+        } catch (Exception e) {
+            log.error("SEANRS app active failed: {} jedis jedisPool init failed!", e.toString());
+            return;
+        }
+
         executor = Executors.newSingleThreadExecutor(groupedThreads("onos/seanet/sea_nrs", "main", log));
         flowRuleService.addListener(flowRuleListener);
         deviceService.addListener(deviceListener);
@@ -230,7 +245,8 @@ public class SeanrsApp {
 
         componentConfigService.unregisterProperties(getClass(), false);
         executor.shutdown();
-
+        // destroy jedis poll
+        jedisPool.destroy();
         log.info("================= Sea_NRS app deactivate =================");
     }
 
@@ -1173,52 +1189,81 @@ public class SeanrsApp {
                     // TODO: 2021/8/22 register or deregister
                     //noinspection IfCanBeSwitch
                     if (queryType.equals("01") || queryType.equals("02")) {
-                        boolean flag = true; // 标记在控制器上是否注册成功
+                        boolean flag = false; // 标记在控制器上是否注册成功
                         byte[] payload = nrsPkt.getPayload();
                         if (payload != null) {
-                            // 转发注册或注销请求给解析单点, 获取响应之后返回
-                            String sendToIRSMsg = Util.msgFormat1ToIRSFormat(SocketUtil.bytesToHexString(payload));
-                            byte[] receive = SendAndRecv.throughUDP(HexUtil.ip2HexString(irsNa, 32), irsPort, SocketUtil.hexStringToBytes(sendToIRSMsg));
-                            if (receive != null) {
-                                if (Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).startsWith("01", 10)) {
-                                    // 注册或注销成功，改payload为格式2，转发给BGP, 控制器不返回注册注销响应报文
-                                    //log.info(">>>> irs-{} response: {} <<<<", queryType.equals("01") ? "register" : "deregister",
-//                                            Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).replaceAll("(00)+$", ""));
-                                    int total_len = 1 + 20 + 16 + 16 + 4 + bgpNum * 16;
-                                    ByteArrayOutputStream baos = new ByteArrayOutputStream(total_len);
-                                    try {
-                                        baos.write(Arrays.copyOfRange(payload, 0, 37));
-                                        baos.write(SocketUtil.hexStringToBytes(fromSwitchIP_hex));
-                                        baos.write(SocketUtil.int2Bytes(bgpNum));
-                                        for (int i = 0; i < bgpNum; i++) {
-                                            String BGP_NA = bgp_Na_List.get(i);
-                                            baos.write(SocketUtil.hexStringToBytes(HexUtil.ip2HexString(BGP_NA, 32)));
-                                        }
-                                    } catch (Exception e) {
-                                        log.error(e.getMessage());
-                                        e.printStackTrace();
-                                        return;
+                            String payload_str = SocketUtil.bytesToHexString(payload);
+                            assert payload_str != null;
+                            String eid = payload_str.substring(2, 42);
+                            String na = payload_str.substring(42, 74);
+                            if (payload[0] == 0x6f) {
+                                // register, push to na_list from eid
+                                Jedis jedis = jedisPool.getResource();
+                                try {
+                                    // add na to eid: na_set
+                                    jedis.sadd(eid, na);
+                                    flag = true;
+                                } catch (JedisException e) {
+                                    jedisPool.returnBrokenResource(jedis);
+                                    System.out.println("jedisPool 'sadd' error, returnBrokenResource");
+                                    jedis = null;
+                                } finally {
+                                    if (jedis != null) {
+                                        jedis.close();
                                     }
-                                    byte[] byteToBGP = baos.toByteArray();
-                                    nrsPkt.setPayload(byteToBGP);
-                                    nrsPkt.setSource((byte) 0x01);
-                                    idpPkt.setPayload(nrsPkt.pack());
-                                    ipv6Pkt.setPayload(new Data(idpPkt.pack()));
-                                    String BGP_NA = bgp_Na_List.get(0); // TODO: 2021/8/23 暂时从BGP列表中选取选取第一个发送
-                                    ipv6Pkt.setDestinationAddress(SocketUtil.hexStringToBytes(HexUtil.ip2HexString(BGP_NA, 32)));
-                                    ethPkt.setPayload(ipv6Pkt);
-                                    //log.info(">>>> {} success! ready to send packet: {} to BGP: {} <<<<", queryType.equals("01") ? "register" : "deregister",
-//                                            SocketUtil.bytesToHexString(ethPkt.serialize()), BGP_NA);
-                                } else {
-                                    flag = false;
-                                    log.error("Receive IRS register/deregister response status is failed");
                                 }
-                            } else {
-                                flag = false;
-                                log.error("Receive packets from IRS is null!");
+
+                            } else if (payload[0] == 0x73) {
+                                // deregister, delete na from na_set
+                                Jedis jedis = jedisPool.getResource();
+                                try {
+                                    // delete na from eid: na_set
+                                    jedis.srem(eid, na);
+                                    flag = true;
+                                } catch (JedisException e) {
+                                    jedisPool.returnBrokenResource(jedis);
+                                    System.out.println("jedisPool 'srem' error, returnBrokenResource");
+                                    jedis = null;
+                                } finally {
+                                    if (jedis != null) {
+                                        jedis.close();
+                                    }
+                                }
                             }
+
+                            if (flag) {
+                                // 注册或注销成功，改payload为格式2，转发给BGP, 控制器不返回注册注销响应报文
+                                log.info(">>>> irs-{} success! with eid->ip: {}->{} <<<<", queryType.equals("01") ? "register" : "deregister", eid, na);
+                                int total_len = 1 + 20 + 16 + 16 + 4 + bgpNum * 16;
+                                ByteArrayOutputStream baos = new ByteArrayOutputStream(total_len);
+                                try {
+                                    baos.write(Arrays.copyOfRange(payload, 0, 37));
+                                    baos.write(SocketUtil.hexStringToBytes(fromSwitchIP_hex));
+                                    baos.write(SocketUtil.int2Bytes(bgpNum));
+                                    for (int i = 0; i < bgpNum; i++) {
+                                        String BGP_NA = bgp_Na_List.get(i);
+                                        baos.write(SocketUtil.hexStringToBytes(HexUtil.ip2HexString(BGP_NA, 32)));
+                                    }
+                                } catch (Exception e) {
+                                    log.error(e.getMessage());
+                                    e.printStackTrace();
+                                    return;
+                                }
+                                byte[] byteToBGP = baos.toByteArray();
+                                nrsPkt.setPayload(byteToBGP);
+                                nrsPkt.setSource((byte) 0x01);
+                                idpPkt.setPayload(nrsPkt.pack());
+                                ipv6Pkt.setPayload(new Data(idpPkt.pack()));
+                                String BGP_NA = bgp_Na_List.get(0); // TODO: 2021/8/23 暂时从BGP列表中选取选取第一个发送
+                                ipv6Pkt.setDestinationAddress(SocketUtil.hexStringToBytes(HexUtil.ip2HexString(BGP_NA, 32)));
+                                ethPkt.setPayload(ipv6Pkt);
+                                log.info(">>>> {} success! ready to send packet: {} to BGP: {} <<<<", queryType.equals("01") ? "register" : "deregister",
+                                        SocketUtil.bytesToHexString(ethPkt.serialize()), BGP_NA);
+                            } else {
+                                log.error("IRS register/deregister status is failed");
+                            }
+
                         } else {
-                            flag = false;
                             log.error("Register message format is wrong, nrs payload is null!");
                         }
                         // 如果注册/注销不成功，向用户发送注册/注销失败响应格式1
@@ -1252,94 +1297,102 @@ public class SeanrsApp {
                         byte[] payload = nrsPkt.getPayload();
                         if (payload != null && nrsPkt.getSource() == 0x01) {
                             // 收到BGP发来的注册/注销失败响应报文（格式2），反操作注册注销
-                            String sendToIRSMsg = Util.msgFormat2ToIRSFormat(SocketUtil.bytesToHexString(payload));
-                            byte[] receive = SendAndRecv.throughUDP(HexUtil.ip2HexString(irsNa, 32), irsPort, SocketUtil.hexStringToBytes(sendToIRSMsg));
-                            if (receive != null && Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).startsWith("01", 10)) {
-                                // 转发给用户注册/注销失败响应报文，响应报文（格式1）
-                                byte[] payload_format1 = new byte[38];
-                                System.arraycopy(payload, 0, payload_format1, 0, payload_format1.length);
-                                nrsPkt.setPayload(payload_format1);
-                                nrsPkt.setSource((byte) 0x00);
-                                idpPkt.setPayload(nrsPkt.pack());
-                                ipv6Pkt.setDestinationAddress(Arrays.copyOfRange(payload, 22, 38)); // 目的地址修改成用户的NA
-                                ipv6Pkt.setPayload(new Data(idpPkt.pack()));
-                                ethPkt.setPayload(ipv6Pkt);
-                                // TODO: 2021/11/30 这个地方应该把MAC填成合适的地址而不是交换一下，暂时先这样 
-                                MacAddress destinationMAC = ethPkt.getDestinationMAC();
-                                ethPkt.setDestinationMACAddress(ethPkt.getSourceMACAddress());
-                                ethPkt.setSourceMACAddress(destinationMAC);
-                                log.warn(">>>> {} failed in bgp, ready to send to client response pkt(format1): {} <<<<",
-                                        queryType.equals("03") ? "register" : "deregister", SocketUtil.bytesToHexString(ethPkt.serialize()));
-                            } else {
-                                log.error("IRS don't response correctly, status is not '01'");
+                            String eid = SocketUtil.bytesToHexString(payload, 2, 20);
+                            String na = SocketUtil.bytesToHexString(payload, 22, 16);
+                            if (payload[0] == 0x70) {
+                                // Indicates that the registration failed, and the reverse operation is to deregister
+                                Jedis jedis = jedisPool.getResource();
+                                try {
+                                    jedis.srem(eid, na);
+                                } catch (JedisException e) {
+                                    jedisPool.returnBrokenResource(jedis);
+                                    jedis = null;
+                                } finally {
+                                    if (jedis != null) {
+                                        jedis.close();
+                                    }
+                                }
+                            } else if (payload[0] == 0x74) {
+                                // Indicates that the deregistration failed, and the reverse operation is to register
+                                Jedis jedis = jedisPool.getResource();
+                                try {
+                                    jedis.sadd(eid, na);
+                                } catch (JedisException e) {
+                                    jedisPool.returnBrokenResource(jedis);
+                                    jedis = null;
+                                } finally {
+                                    if (jedis != null) {
+                                        jedis.close();
+                                    }
+                                }
                             }
+                            // 转发给用户注册/注销失败响应报文，响应报文（格式1）
+                            byte[] payload_format1 = new byte[38];
+                            System.arraycopy(payload, 0, payload_format1, 0, payload_format1.length);
+                            nrsPkt.setPayload(payload_format1);
+                            nrsPkt.setSource((byte) 0x00);
+                            idpPkt.setPayload(nrsPkt.pack());
+                            ipv6Pkt.setDestinationAddress(Arrays.copyOfRange(payload, 22, 38)); // 目的地址修改成用户的NA
+                            ipv6Pkt.setPayload(new Data(idpPkt.pack()));
+                            ethPkt.setPayload(ipv6Pkt);
+                            // TODO: 2021/11/30 这个地方应该把MAC填成合适的地址而不是交换一下，暂时先这样
+                            MacAddress destinationMAC = ethPkt.getDestinationMAC();
+                            ethPkt.setDestinationMACAddress(ethPkt.getSourceMACAddress());
+                            ethPkt.setSourceMACAddress(destinationMAC);
+                            log.warn(">>>> {} failed in bgp, ready to send to client response pkt(format1): {} <<<<",
+                                    queryType.equals("03") ? "register" : "deregister", SocketUtil.bytesToHexString(ethPkt.serialize()));
+
                         }
                     }
 
                     // TODO: 2021/8/22 resolve
                     else if (queryType.equals("05")) {
 //                        byte[] payload = nrsPkt.getPayload().serialize();
-                        // 发送给解析单点解析请求 TODO: 暂时未考虑tag解析
-                        String resolveMsg = "71" + "000000" + Util.getRandomRequestID() + dstEid + Util.getTimestamp();
-                        byte[] receive = SendAndRecv.throughUDP(HexUtil.ip2HexString(irsNa, 32), irsPort, SocketUtil.hexStringToBytes(resolveMsg));
-                        String na = HexUtil.zeros(32);
-                        int na_num = SocketUtil.byteArrayToShort(receive, 12);
-                        if (receive[1] == 1) {
-                            //log.info(">>>> irs-resolve response: {} , NA number: {} <<<<",
-//                                    Objects.requireNonNull(SocketUtil.bytesToHexString(receive)).replaceAll("(00)+$", ""), na_num);
-                            if (na_num > 0) {
-                                // 解析成功!，将返回的NA的第一个填入ipv6的dstIP字段 TODO：是否有选ip的策略？
-                                na = SocketUtil.bytesToHexString(Arrays.copyOfRange(receive, 34, 50));
-//                                eid_na_map.put(dstEid, na);
-                                // 给AE发送缓存更新包, 这个包要重新走pipeline->goToTable0
-                                nrsPkt.setSource(SocketUtil.hexStringToBytes("02")[0]); // FromAE -> ToAE
-                                idpPkt.setPayload(nrsPkt.pack());
-                                IPv6 ipv6Pkt_copy = (IPv6) ipv6Pkt.clone();
-                                ipv6Pkt_copy.setPayload(new Data(idpPkt.pack()));
-                                ipv6Pkt_copy.setDestinationAddress(SocketUtil.hexStringToBytes(na));
-                                Ethernet eth_pkt_copy = (Ethernet) ethPkt.clone();
-                                eth_pkt_copy.setPayload(ipv6Pkt_copy);
-                                // 解析包的话需要把解析结果带给AE进行缓存更新
-                                OFInstruction ofInstructionGotoTable1 = new OFInstructionGotoTable(FIRST_TABLE);
-                                InstructionTreatment treatment_ae = new InstructionTreatment();
-                                treatment_ae.addInstruction(ofInstructionGotoTable1);
-                                TrafficTreatment.Builder builder = DefaultTrafficTreatment.builder();
-                                builder.extension(treatment_ae, deviceId);
-                                byte[] outPutBytes = eth_pkt_copy.serialize();
-                                ByteBuffer bf = ByteBuffer.allocate(outPutBytes.length);
-                                bf.put(outPutBytes).flip();
-                                packetService.emit(new DefaultOutboundPacket(deviceId, builder.build(), bf));
-                                //log.info(">>>> packet for updating AE cache: " + SocketUtil.bytesToHexString(outPutBytes) + " <<<<");
-                            } else {
-                                // 解析不到
-                                String source = HexUtil.byte2HexString(nrsPkt.getSource());
-                                if (source.equals("00")) {
-                                    // 包是从客户端发来的
-                                    String BGP_NA = bgp_Na_List.get(0);
-                                    na = HexUtil.ip2HexString(BGP_NA, 32);
-                                } else if (source.equals("01")) {
-                                    // 包是从BGP发来的
-                                    nrsPkt.setQueryType(SocketUtil.hexStringToBytes("06")[0]);
-                                    nrsPkt.setSource(SocketUtil.hexStringToBytes("00")[0]);
-                                    nrsPkt.setNa(fromSwitchIP_hex);
-                                    na = HexUtil.ip2HexString(bgp_Na_List.get(0), 32); // TODO: 2021/8/24 这里我怎么知道哪个BGP给我发的请求？
-                                    idpPkt.setPayload(nrsPkt.pack());
-                                    ipv6Pkt.setPayload(new Data(idpPkt.pack()));
-                                    MacAddress destinationMAC = ethPkt.getDestinationMAC();
-                                    ethPkt.setDestinationMACAddress(ethPkt.getSourceMACAddress());
-                                    ethPkt.setSourceMACAddress(destinationMAC);
-                                } else {
-                                    log.error("packet source is unknown!");
-                                }
+                        // get na from eid use jedis
+                        Jedis jedis = jedisPool.getResource();
+                        String na = null;
+                        try {
+                            Set<String> naSet = jedis.smembers(dstEid);
+                            if (naSet != null && naSet.size() > 0) {
+                                na = naSet.iterator().next();
+                                log.info(">>>> get na: {} from eid: {} success! <<<<", na, dstEid);
                             }
-                        } else {
-                            // 解析失败会怎么处理？
-                            log.error("resolve in irs failed, maybe IRS cannot connect successfully");
+                        } catch (JedisException e) {
+                            jedisPool.returnBrokenResource(jedis);
+                            jedis = null;
+                        } finally {
+                            if (jedis != null) {
+                                jedis.close();
+                            }
                         }
+
+                        if (na == null) {
+                            // 解析不到
+                            String source = HexUtil.byte2HexString(nrsPkt.getSource());
+                            if (source.equals("00")) {
+                                // 包是从客户端发来的
+                                String BGP_NA = bgp_Na_List.get(0);
+                                na = HexUtil.ip2HexString(BGP_NA, 32);
+                            } else if (source.equals("01")) {
+                                // 包是从BGP发来的
+                                nrsPkt.setQueryType(SocketUtil.hexStringToBytes("06")[0]);
+                                nrsPkt.setSource(SocketUtil.hexStringToBytes("00")[0]);
+                                nrsPkt.setNa(fromSwitchIP_hex);
+                                na = HexUtil.ip2HexString(bgp_Na_List.get(0), 32); // TODO: 2021/8/24 这里我怎么知道哪个BGP给我发的请求？
+                                idpPkt.setPayload(nrsPkt.pack());
+                                ipv6Pkt.setPayload(new Data(idpPkt.pack()));
+                                MacAddress destinationMAC = ethPkt.getDestinationMAC();
+                                ethPkt.setDestinationMACAddress(ethPkt.getSourceMACAddress());
+                                ethPkt.setSourceMACAddress(destinationMAC);
+                            } else {
+                                log.error("resolve na is null but packet source is unknown!");
+                            }
+                        }
+
                         ipv6Pkt.setDestinationAddress(SocketUtil.hexStringToBytes(na));
                         ethPkt.setPayload(ipv6Pkt);
                         // TODO: 2021/8/30 是否下发流表项，下发策略？ 解析失败则不下表项？
-                        if (dstEid != null && na_num != 0) {
+                        if (dstEid != null && na != null) {
                             {
                                 FlowRule blockFlowRule = buildSetAddrAndGotoTableInstructionBlock(deviceId, na, seanrs_next_tableid);
                                 flowRuleService.applyFlowRules(blockFlowRule);
@@ -1357,7 +1410,6 @@ public class SeanrsApp {
                                 }
                                 addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, finalNa, seanrs_tableid_ipv6, seanrs_next_tableid);
                             });
-
                         }
                     }
 //                  FlowModTreatment flowModTreatment = new FlowModTreatment(buildSetOffsetAndGotoTableInstructionBlock(deviceId, seanrs_next_tableid).id().value());
