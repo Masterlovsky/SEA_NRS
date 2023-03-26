@@ -1365,8 +1365,28 @@ public class SeanrsApp {
                                 jedis.close();
                             }
                         }
-
-                        if (na == null) {
+                        if (na != null) {
+                            // 给AE发送缓存更新包, 这个包要重新走pipeline->goToTable0
+                            nrsPkt.setSource((byte) 0x02); // FromAE -> ToAE
+                            idpPkt.setPayload(nrsPkt.pack());
+                            IPv6 ipv6Pkt_copy = (IPv6) ipv6Pkt.clone();
+                            ipv6Pkt_copy.setPayload(new Data(idpPkt.pack()));
+                            ipv6Pkt_copy.setDestinationAddress(SocketUtil.hexStringToBytes(na));
+                            Ethernet eth_pkt_copy = (Ethernet) ethPkt.clone();
+                            eth_pkt_copy.setPayload(ipv6Pkt_copy);
+                            // 解析包的话需要把解析结果带给AE进行缓存更新
+                            OFInstruction ofInstructionGotoTable1 = new OFInstructionGotoTable(FIRST_TABLE);
+                            InstructionTreatment treatment_ae = new InstructionTreatment();
+                            treatment_ae.addInstruction(ofInstructionGotoTable1);
+                            TrafficTreatment.Builder builder = DefaultTrafficTreatment.builder();
+                            builder.extension(treatment_ae, deviceId);
+                            byte[] outPutBytes = eth_pkt_copy.serialize();
+                            ByteBuffer bf = ByteBuffer.allocate(outPutBytes.length);
+                            bf.put(outPutBytes).flip();
+                            packetService.emit(new DefaultOutboundPacket(deviceId, builder.build(), bf));
+                            //log.info(">>>> packet for updating AE cache: " + SocketUtil.bytesToHexString(outPutBytes) + " <<<<");
+                        }
+                        else {
                             // 解析不到
                             String source = HexUtil.byte2HexString(nrsPkt.getSource());
                             if (source.equals("00")) {
