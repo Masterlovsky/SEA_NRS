@@ -205,6 +205,7 @@ public class SeanrsApp {
 //        use multi-thread to send flow tables and packet processors
         int threadNum = Runtime.getRuntime().availableProcessors();
         executor = Executors.newFixedThreadPool(threadNum, groupedThreads("onos/seanet/sea_nrs", "main", log));
+        log.info("SEANRS app - [thread]: {} threads, executor init success!", threadNum);
         flowRuleService.addListener(flowRuleListener);
         deviceService.addListener(deviceListener);
         mastershipService.addListener(mastershipListener);
@@ -1420,25 +1421,26 @@ public class SeanrsApp {
                         ipv6Pkt.setDestinationAddress(SocketUtil.hexStringToBytes(na));
                         ethPkt.setPayload(ipv6Pkt);
                         // TODO: 2021/8/30 是否下发流表项，下发策略？ 解析失败则不下表项？
-                        if (dstEid != null && na != null) {
-                            {
-                                FlowRule blockFlowRule = buildSetAddrAndGotoTableInstructionBlock(deviceId, na, seanrs_next_tableid);
-                                flowRuleService.applyFlowRules(blockFlowRule);
-                                instructionBlockSentCache.add(blockFlowRule);
-                            }
-                            String finalNa = na;
-                            executor.execute(() -> {
-                                if (!allInstructionBlocksInstalled(deviceId)) {
-                                    try {
-                                        Thread.sleep(1000);
-                                        log.warn("allInstructionBlocksInstalled={}, sleep 1s", allInstructionBlocksInstalled(deviceId));
-                                    } catch (InterruptedException e) {
-                                        e.printStackTrace();
-                                    }
-                                }
-                                addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, finalNa, seanrs_tableid_ipv6, seanrs_next_tableid);
-                            });
-                        }
+                        // todo: 2023/03/27 不下表项了，交给AE触发本地控制器去下表项，提升并发性能
+//                        if (dstEid != null && na != null) {
+//                            {
+//                                FlowRule blockFlowRule = buildSetAddrAndGotoTableInstructionBlock(deviceId, na, seanrs_next_tableid);
+//                                flowRuleService.applyFlowRules(blockFlowRule);
+//                                instructionBlockSentCache.add(blockFlowRule);
+//                            }
+//                            String finalNa = na;
+//                            executor.execute(() -> {
+//                                if (!allInstructionBlocksInstalled(deviceId)) {
+//                                    try {
+//                                        Thread.sleep(1000);
+//                                        log.warn("allInstructionBlocksInstalled={}, sleep 1s", allInstructionBlocksInstalled(deviceId));
+//                                    } catch (InterruptedException e) {
+//                                        e.printStackTrace();
+//                                    }
+//                                }
+//                                addSetIPDstAddrAndGoToTableFlowEntry(deviceId, dstEid, finalNa, seanrs_tableid_ipv6, seanrs_next_tableid);
+//                            });
+//                        }
                     }
 //                  FlowModTreatment flowModTreatment = new FlowModTreatment(buildSetOffsetAndGotoTableInstructionBlock(deviceId, seanrs_next_tableid).id().value());
 //                  send packet out, bind(GoToTable)
