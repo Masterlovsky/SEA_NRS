@@ -201,7 +201,10 @@ public class SeanrsApp {
             return;
         }
 
-        executor = Executors.newSingleThreadExecutor(groupedThreads("onos/seanet/sea_nrs", "main", log));
+//        executor = Executors.newSingleThreadExecutor(groupedThreads("onos/seanet/sea_nrs", "main", log));
+//        use multi-thread to send flow tables and packet processors
+        int threadNum = Runtime.getRuntime().availableProcessors();
+        executor = Executors.newFixedThreadPool(threadNum, groupedThreads("onos/seanet/sea_nrs", "main", log));
         flowRuleService.addListener(flowRuleListener);
         deviceService.addListener(deviceListener);
         mastershipService.addListener(mastershipListener);
@@ -1132,7 +1135,8 @@ public class SeanrsApp {
             if (context.isHandled()) {
                 return;
             }
-            nrsPacketInProcess(context);
+            executor.execute(() -> nrsPacketInProcess(context));
+//            nrsPacketInProcess(context);
 //            onlyPktOut(context);
         }
 
