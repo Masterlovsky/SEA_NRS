@@ -78,24 +78,50 @@ public class SocketUtil {
     }
 
     public static byte[] ipv6toBytes(String ipAddress) {
-        String[] parts = ipAddress.split(":");
         byte[] bytes = new byte[16];
-        int i = 0;
-        for (String part : parts) {
-            if (part.isEmpty()) {
-                int numEmpty = 8 - parts.length + 1;
-                for (int j = 0; j < numEmpty; j++, i += 2) {
-                    bytes[i] = 0;
-                    bytes[i + 1] = 0;
+        int group = 0;
+        int index = 0;
+        int compressIdx = -1;
+        boolean compressed = false;
+        for (int i = 0; i < ipAddress.length(); i++) {
+            char c = ipAddress.charAt(i);
+            if (c == ':') {
+                if (i > 0 && ipAddress.charAt(i - 1) == ':') {
+                    if (compressIdx != -1) {
+                        return null;
+                    }
+                    compressed = true;
+                    compressIdx = index;
+                    continue;
                 }
+                group++;
+                index = group * 2;
                 continue;
             }
-            byte[] partBytes = hexStringToBytes(part);
-            System.arraycopy(partBytes, 0, bytes, i, partBytes.length);
-            i += 2 * partBytes.length;
+            int digit = Character.digit(c, 16);
+            if (digit == -1) {
+                return null;
+            }
+            if (index >= bytes.length) {
+                return null;
+            }
+            if (index == compressIdx) {
+                index += (8 - group) * 2;
+                continue;
+            }
+            if (index % 2 == 0) {
+                bytes[index] = (byte) (digit << 4);
+            } else {
+                bytes[index - 1] |= digit;
+            }
+            index++;
+        }
+        if (group < 8 && !compressed) {
+            return null;
         }
         return bytes;
     }
+
 
 
     public static byte[] ip2Bytes(String ip) {
