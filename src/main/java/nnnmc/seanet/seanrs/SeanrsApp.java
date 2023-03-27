@@ -1178,7 +1178,6 @@ public class SeanrsApp {
                 // TODO: 2021/7/27 UDP 实际上并不会执行
                 log.debug("receive UDP packet, content: {}", SocketUtil.bytesToHexString(ipv6Pkt.serialize()));
             } else if (nextHdr == 0x99) {
-                // TODO: 2021/7/27 IDP 暂定使用扩展包头的方式
                 IDP idpPkt = new IDP().unpack(ipv6Pkt.getPayload().serialize());
                 String nextHeader = HexUtil.byte2HexString(idpPkt.getNextHeader());
                 String dstEid = idpPkt.getDestEID();
