@@ -1238,11 +1238,16 @@ public class SeanrsApp {
                                 ByteArrayOutputStream baos = new ByteArrayOutputStream(total_len);
                                 try {
                                     baos.write(Arrays.copyOfRange(payload, 0, 37));
-                                    baos.write(SocketUtil.hexStringToBytes(fromSwitchIP_hex));
+                                    baos.write(SocketUtil.ip2Bytes(fromSwitchIP));
                                     baos.write(SocketUtil.int2Bytes(bgpNum));
                                     for (int i = 0; i < bgpNum; i++) {
                                         String BGP_NA = bgp_Na_List.get(i);
-                                        baos.write(SocketUtil.hexStringToBytes(HexUtil.ip2HexString(BGP_NA, 32)));
+                                        byte[] bgp_bytes = SocketUtil.ip2Bytes(BGP_NA);
+                                        if (bgp_bytes == null) {
+                                            log.error(">>>> bgp_na: {} is not a valid ipv6 address <<<<", BGP_NA);
+                                            return;
+                                        }
+                                        baos.write(bgp_bytes);
                                     }
                                 } catch (Exception e) {
                                     log.error(e.getMessage());
@@ -1255,7 +1260,7 @@ public class SeanrsApp {
                                 idpPkt.setPayload(nrsPkt.pack());
                                 ipv6Pkt.setPayload(new Data(idpPkt.pack()));
                                 String BGP_NA = bgp_Na_List.get(0); // TODO: 2021/8/23 暂时从BGP列表中选取选取第一个发送
-                                ipv6Pkt.setDestinationAddress(SocketUtil.hexStringToBytes(HexUtil.ip2HexString(BGP_NA, 32)));
+                                ipv6Pkt.setDestinationAddress(SocketUtil.ip2Bytes(BGP_NA));
                                 ethPkt.setPayload(ipv6Pkt);
 //                                log.info(">>>> {} success! ready to send packet: {} to BGP: {} <<<<", queryType.equals("01") ? "register" : "deregister",
 //                                        SocketUtil.bytesToHexString(ethPkt.serialize()), BGP_NA);
@@ -1282,7 +1287,7 @@ public class SeanrsApp {
                             idpPkt.setPayload(nrsPkt.pack());
                             ipv6Pkt.setPayload(new Data(idpPkt.pack()));
                             ipv6Pkt.setDestinationAddress(ipv6Pkt.getSourceAddress());
-                            ipv6Pkt.setSourceAddress(SocketUtil.hexStringToBytes(fromSwitchIP_hex));
+                            ipv6Pkt.setSourceAddress(SocketUtil.ip2Bytes(fromSwitchIP));
                             ethPkt.setPayload(ipv6Pkt);
                             byte[] sourceMACAddress = ethPkt.getSourceMACAddress();
                             ethPkt.setSourceMACAddress(ethPkt.getDestinationMACAddress());
@@ -1395,8 +1400,8 @@ public class SeanrsApp {
                                 na = HexUtil.ip2HexString(BGP_NA, 32);
                             } else if (source.equals("01")) {
                                 // 包是从BGP发来的
-                                nrsPkt.setQueryType(SocketUtil.hexStringToBytes("06")[0]);
-                                nrsPkt.setSource(SocketUtil.hexStringToBytes("00")[0]);
+                                nrsPkt.setQueryType((byte) 0x06);
+                                nrsPkt.setSource((byte) 0x00);
                                 nrsPkt.setNa(fromSwitchIP_hex);
                                 na = HexUtil.ip2HexString(bgp_Na_List.get(0), 32); // TODO: 2021/8/24 这里我怎么知道哪个BGP给我发的请求？
                                 idpPkt.setPayload(nrsPkt.pack());

@@ -3,8 +3,8 @@ package nnnmc.seanet.seanrs.util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.net.Inet6Address;
+import java.net.UnknownHostException;
 
 public class HexUtil {
     private static final Logger logger = LoggerFactory.getLogger(HexUtil.class);
@@ -59,33 +59,47 @@ public class HexUtil {
         return zeros(totalLen - 8) + hexIp.toString();
     }
 
-    public static String ipv62HexString(String ip) {
-        StringBuilder stringBuilder = new StringBuilder();
-        String[] splited = ip.split(":");
-        List<String> arr_list = new ArrayList<>();
-        if (splited.length != 8) {
-            int index = 0;
-            for (int i = 0; i < splited.length; i++) {
-                if (!splited[i].equals("")) {
-                    arr_list.add(splited[i]);
-                } else {
-                    index = i;
-                }
+//    public static String ipv62HexString(String ip) {
+//        StringBuilder stringBuilder = new StringBuilder();
+//        String[] splited = ip.split(":");
+//        List<String> arr_list = new ArrayList<>();
+//        if (splited.length != 8) {
+//            int index = 0;
+//            for (int i = 0; i < splited.length; i++) {
+//                if (!splited[i].equals("")) {
+//                    arr_list.add(splited[i]);
+//                } else {
+//                    index = i;
+//                }
+//            }
+//            for (int i = 0; i <= 8 - splited.length; i++) {
+//                arr_list.add(index, "0");
+//            }
+//            splited = arr_list.toArray(new String[0]);
+//        }
+//        for (String part : splited) {
+//            int partLen = part.length();
+//            if (partLen > 4) {
+//                part = part.substring(0, 4);
+//            }
+//            stringBuilder.append(zeros(4 - partLen)).append(part);
+//        }
+//        return stringBuilder.toString();
+//    }
+
+    public static String ipv62HexString(String ipAddress) {
+        try {
+            byte[] ipv6Bytes = Inet6Address.getByName(ipAddress).getAddress();
+            StringBuilder hexStringBuffer = new StringBuilder();
+            for (byte b : ipv6Bytes) {
+                hexStringBuffer.append(String.format("%02x", b));
             }
-            for (int i = 0; i <= 8 - splited.length; i++) {
-                arr_list.add(index, "0");
-            }
-            splited = arr_list.toArray(new String[0]);
+            return hexStringBuffer.toString();
+        } catch (UnknownHostException e) {
+            return null;
         }
-        for (String part : splited) {
-            int partLen = part.length();
-            if (partLen > 4) {
-                part = part.substring(0, 4);
-            }
-            stringBuilder.append(zeros(4 - partLen)).append(part);
-        }
-        return stringBuilder.toString();
     }
+
 
     public static String hexString2Ip(String hexString) {
         if (hexString.startsWith(HexUtil.zeros(24))) {

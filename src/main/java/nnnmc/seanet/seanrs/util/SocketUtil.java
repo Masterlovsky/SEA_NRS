@@ -6,11 +6,14 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.math.BigInteger;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
+import java.net.UnknownHostException;
 
 public class SocketUtil {
-    private static Logger logger = LoggerFactory.getLogger(SocketUtil.class);
+    private static final Logger logger = LoggerFactory.getLogger(SocketUtil.class);
 
     public static String bytesToHexString(byte[] src) {
         StringBuilder stringBuilder = new StringBuilder();
@@ -65,6 +68,30 @@ public class SocketUtil {
             d[i] = (byte) (charToByte(hexChars[pos]) << 4 | charToByte(hexChars[pos + 1]));
         }
         return d;
+    }
+
+    public static byte[] ipv42Bytes(String ip) {
+        try {
+            return Inet4Address.getByName(ip).getAddress();
+        } catch (UnknownHostException e) {
+            return null;
+        }
+    }
+
+    public static byte[] ipv6toBytes(String ipAddress) {
+        try {
+            return Inet6Address.getByName(ipAddress).getAddress();
+        } catch (UnknownHostException e) {
+            return null;
+        }
+    }
+
+    public static byte[] ip2Bytes(String ip) {
+        if (ip.contains(":")) {
+            return ipv6toBytes(ip);
+        } else {
+            return ipv42Bytes(ip);
+        }
     }
 
     /**
