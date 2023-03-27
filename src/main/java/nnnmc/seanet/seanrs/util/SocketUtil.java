@@ -10,6 +10,7 @@ import java.math.BigInteger;
 import java.net.Inet4Address;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 public class SocketUtil {
     private static final Logger logger = LoggerFactory.getLogger(SocketUtil.class);
@@ -78,50 +79,36 @@ public class SocketUtil {
     }
 
     public static byte[] ipv6toBytes(String ipAddress) {
-        byte[] bytes = new byte[16];
-        int group = 0;
-        int index = 0;
-        int compressIdx = -1;
-        boolean compressed = false;
-        for (int i = 0; i < ipAddress.length(); i++) {
-            char c = ipAddress.charAt(i);
-            if (c == ':') {
-                if (i > 0 && ipAddress.charAt(i - 1) == ':') {
-                    if (compressIdx != -1) {
-                        return null;
-                    }
-                    compressed = true;
-                    compressIdx = index;
-                    continue;
+        byte[] result = new byte[16];
+        String[] chunks = ipAddress.split(":");
+        boolean hasDoubleColon = false;
+        int doubleColonIndex = -1;
+        int cIndex = 0;
+        // 处理每个块
+        for (int i = 0; i < chunks.length; i++) {
+            if (chunks[i].isEmpty()) { // 处理双冒号情况
+                if (!hasDoubleColon) {
+                    hasDoubleColon = true;
+                    doubleColonIndex = cIndex;
+                } else {
+                    throw new IllegalArgumentException("Invalid IPv6 address: " + ipAddress);
                 }
-                group++;
-                index = group * 2;
-                continue;
-            }
-            int digit = Character.digit(c, 16);
-            if (digit == -1) {
-                return null;
-            }
-            if (index >= bytes.length) {
-                return null;
-            }
-            if (index == compressIdx) {
-                index += (8 - group) * 2;
-                continue;
-            }
-            if (index % 2 == 0) {
-                bytes[index] = (byte) (digit << 4);
             } else {
-                bytes[index - 1] |= digit;
+                int value = Integer.parseInt(chunks[i], 16);
+                result[cIndex * 2] = (byte) ((value >> 8) & 0xFF);
+                result[cIndex * 2 + 1] = (byte) (value & 0xFF);
+                cIndex++;
             }
-            index++;
         }
-        if (group < 8 && !compressed) {
-            return null;
+        if (hasDoubleColon) { // 处理缺省地址情况
+            int numZeros = result.length / 2 - cIndex;
+            int lastBlockIndex = result.length / 2 - 1;
+            System.arraycopy(result, doubleColonIndex * 2, result, (lastBlockIndex - numZeros + 1) * 2,
+                    (cIndex - doubleColonIndex) * 2);
+            Arrays.fill(result, doubleColonIndex * 2, (lastBlockIndex - numZeros + 1) * 2, (byte) 0);
         }
-        return bytes;
+        return result;
     }
-
 
 
     public static byte[] ip2Bytes(String ip) {
