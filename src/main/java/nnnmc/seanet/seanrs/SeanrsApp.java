@@ -1233,7 +1233,7 @@ public class SeanrsApp {
 
                             if (flag) {
                                 // 注册或注销成功，改payload为格式2，转发给BGP, 控制器不返回注册注销响应报文
-                                log.info(">>>> irs-{} success! with eid->ip: {}->{} <<<<", queryType.equals("01") ? "register" : "deregister", eid, na);
+//                                log.info(">>>> irs-{} success! with eid->ip: {}->{} <<<<", queryType.equals("01") ? "register" : "deregister", eid, na);
                                 int total_len = 1 + 20 + 16 + 16 + 4 + bgpNum * 16;
                                 ByteArrayOutputStream baos = new ByteArrayOutputStream(total_len);
                                 try {
@@ -1257,8 +1257,8 @@ public class SeanrsApp {
                                 String BGP_NA = bgp_Na_List.get(0); // TODO: 2021/8/23 暂时从BGP列表中选取选取第一个发送
                                 ipv6Pkt.setDestinationAddress(SocketUtil.hexStringToBytes(HexUtil.ip2HexString(BGP_NA, 32)));
                                 ethPkt.setPayload(ipv6Pkt);
-                                log.info(">>>> {} success! ready to send packet: {} to BGP: {} <<<<", queryType.equals("01") ? "register" : "deregister",
-                                        SocketUtil.bytesToHexString(ethPkt.serialize()), BGP_NA);
+//                                log.info(">>>> {} success! ready to send packet: {} to BGP: {} <<<<", queryType.equals("01") ? "register" : "deregister",
+//                                        SocketUtil.bytesToHexString(ethPkt.serialize()), BGP_NA);
                             } else {
                                 log.error("IRS register/deregister status is failed");
                             }
@@ -1355,7 +1355,7 @@ public class SeanrsApp {
                             Set<String> naSet = jedis.smembers(dstEid);
                             if (naSet != null && naSet.size() > 0) {
                                 na = naSet.iterator().next();
-                                log.info(">>>> get na: {} from eid: {} success! <<<<", na, dstEid);
+//                                log.info(">>>> get na: {} from eid: {} success! <<<<", na, dstEid);
                             }
                         } catch (JedisException e) {
                             jedisPool.returnBrokenResource(jedis);
